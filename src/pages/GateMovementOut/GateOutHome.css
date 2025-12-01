@@ -1,0 +1,362 @@
+/* Gate UI theme (scoped to page classes used by GateEntry screens) */
+
+/* Design tokens */
+:root {
+  --gate-color-primary: #0b74ff;
+  --gate-color-primary-600: #0366e5;
+  --gate-color-primary-700: #0057d9;
+  --gate-color-surface: #ffffff;
+  --gate-color-bg: #f5f7fb;
+  --gate-color-text: #0f172a;
+  --gate-color-text-muted: #64748b;
+  --gate-color-border: #e6eef5;
+  --gate-color-border-strong: #d1dbe6;
+  --gate-color-success: #16a34a;
+  --gate-color-success-600: #059669;
+  --gate-color-error: #dc2626;
+  --gate-shadow-sm: 0 1px 3px rgba(2,6,23,0.08);
+  --gate-shadow-md: 0 8px 24px rgba(2,6,23,0.08);
+  --gate-radius-sm: 8px;
+  --gate-radius-md: 12px;
+}
+
+/* Page container (card) */
+.create-header-container {
+  max-width: 1200px;
+  margin: 28px auto;
+  padding: 24px;
+  background: var(--gate-color-surface);
+  border-radius: var(--gate-radius-md);
+  box-shadow: var(--gate-shadow-md);
+  border: 1px solid var(--gate-color-border);
+}
+
+/* Page title */
+.page-title {
+  color: var(--gate-color-text);
+  font-size: 1.9rem;
+  font-weight: 700;
+  text-align: center;
+  margin-bottom: 28px;
+  padding-bottom: 16px;
+  position: relative;
+}
+.page-title::after {
+  content: "";
+  display: block;
+  width: 72px;
+  height: 3px;
+  margin: 12px auto 0;
+  background: linear-gradient(90deg, var(--gate-color-primary), var(--gate-color-primary-700));
+  border-radius: 2px;
+}
+
+/* Sections */
+.form-section {
+  margin-bottom: 28px;
+  background: var(--gate-color-surface);
+  padding: 22px;
+  border-radius: var(--gate-radius-sm);
+  border: 1px solid var(--gate-color-border);
+  box-shadow: var(--gate-shadow-sm);
+}
+
+.section-title {
+  color: var(--gate-color-primary);
+  font-size: 1.2rem;
+  font-weight: 700;
+  margin-bottom: 18px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.section-title::before {
+  content: "";
+  width: 8px;
+  height: 20px;
+  background: linear-gradient(180deg, var(--gate-color-primary), var(--gate-color-primary-700));
+  border-radius: 99px;
+  display: inline-block;
+}
+
+/* Grids */
+.grid-3-cols {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 18px;
+}
+.grid-4-cols {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
+}
+
+/* Form controls */
+.form-group { margin-bottom: 6px; }
+
+.form-label,
+label {
+  display: block;
+  font-size: 0.88rem;
+  margin-bottom: 6px;
+  color: var(--gate-color-text-muted);
+  font-weight: 600;
+}
+
+.form-input,
+input[type="text"],
+input[type="date"],
+input[type="time"],
+input[type="number"],
+select,
+textarea {
+  width: 100%;
+  padding: 11px 12px;
+  border: 1px solid var(--gate-color-border-strong);
+  border-radius: 8px;
+  font-size: 0.96rem;
+  color: var(--gate-color-text);
+  background: #fff;
+  transition: border-color .18s, box-shadow .18s, transform .02s;
+  box-sizing: border-box;
+}
+
+.form-textarea,
+textarea {
+  min-height: 64px;
+  resize: vertical;
+}
+
+input:focus,
+select:focus,
+textarea:focus,
+.form-input:focus {
+  outline: none;
+  border-color: var(--gate-color-primary);
+  box-shadow: 0 0 0 3px rgba(11, 116, 255, 0.12);
+}
+
+input[readonly],
+textarea[readonly] {
+  background: #f8fafc;
+  color: #334155;
+}
+
+/* Buttons */
+.form-actions {
+  display: flex;
+  gap: 12px;
+  margin-top: 10px;
+  justify-content: flex-end;
+}
+
+.btn {
+  padding: 12px 18px;
+  border-radius: 10px;
+  font-weight: 700;
+  font-size: 0.96rem;
+  cursor: pointer;
+  border: none;
+  transition: transform .05s ease, box-shadow .2s ease, background .2s ease, opacity .2s;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.btn:active { transform: translateY(1px); }
+
+.btn-primary {
+  background: linear-gradient(180deg, var(--gate-color-primary), var(--gate-color-primary-700));
+  color: #fff;
+  box-shadow: 0 8px 20px rgba(11,116,255,0.18);
+}
+.btn-primary:hover { background: var(--gate-color-primary-600); }
+.btn-primary.disabled,
+.btn-primary[disabled] {
+  opacity: .65;
+  cursor: not-allowed;
+  box-shadow: none;
+}
+
+.btn-secondary {
+  background: #ffffff;
+  border: 1px solid #cbd5e1;
+  color: var(--gate-color-text);
+}
+.btn-secondary:hover {
+  background: #f8fafc;
+  border-color: #94a3b8;
+}
+
+/* PO/Materials card */
+.po-entry-card {
+  background: #fbfdff;
+  border: 1px solid var(--gate-color-border);
+  border-radius: 10px;
+  padding: 18px;
+  margin-bottom: 16px;
+}
+.po-entry-title {
+  color: #0f172a;
+  font-size: 1.05rem;
+  font-weight: 700;
+  margin: 0 0 14px;
+  text-align: left;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.po-entry-title::before {
+  content: "";
+  width: 6px;
+  height: 18px;
+  background: var(--gate-color-primary);
+  border-radius: 4px;
+  display: inline-block;
+}
+
+/* Messages */
+.error-message {
+  margin-top: 18px;
+  padding: 14px 16px;
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  border-radius: 10px;
+  color: var(--gate-color-error);
+  font-weight: 600;
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+}
+
+.success-message {
+  margin-top: 20px;
+  padding: 0;
+  background: transparent;
+  border: none;
+  border-radius: 12px;
+  animation: slideIn .28s ease-out;
+  overflow: hidden;
+  box-shadow: var(--gate-shadow-sm);
+}
+.success-header {
+  background: linear-gradient(90deg, var(--gate-color-success), var(--gate-color-success-600));
+  color: white;
+  padding: 14px 16px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.success-content {
+  background: #f0fdf4;
+  border: 1px solid #bbf7d0;
+  border-top: none;
+  padding: 16px;
+}
+
+/* Minor helpers */
+.gate-number-display {
+  background: #f8fff9;
+  padding: 12px;
+  border-radius: 10px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+  border: 1px solid #dcfce7;
+}
+.gate-number-display label {
+  font-size: 0.9rem;
+  color: #065f46;
+}
+.gate-number-display span {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, "Roboto Mono", "Courier New", monospace;
+  font-size: 1.1rem;
+  color: #065f46;
+  padding: 8px 12px;
+  background: #ffffff;
+  border-radius: 6px;
+  border: 1px solid #d1f5e0;
+}
+
+/* Optional: status badge */
+.badge {
+  display: inline-block;
+  font-size: 0.75rem;
+  font-weight: 700;
+  padding: 4px 8px;
+  border-radius: 999px;
+  border: 1px solid var(--gate-color-border);
+  background: #f8fafc;
+  color: #0f172a;
+}
+
+/* Animation */
+@keyframes slideIn {
+  from { opacity: 0; transform: translateY(10px) }
+  to { opacity: 1; transform: translateY(0) }
+}
+
+/* Responsive */
+@media (max-width: 1200px) {
+  .create-header-container { margin: 20px; }
+}
+@media (max-width: 1024px) {
+  .grid-3-cols { grid-template-columns: repeat(2, 1fr); }
+  .grid-4-cols { grid-template-columns: repeat(2, 1fr); }
+}
+@media (max-width: 768px) {
+  .create-header-container { padding: 18px; }
+  .grid-3-cols, .grid-4-cols { grid-template-columns: 1fr; }
+  .form-actions { flex-direction: column; }
+  .btn { width: 100%; }
+}
+
+/* Optional dark-mode polish (inherits app dark if enabled) */
+@media (prefers-color-scheme: dark) {
+  .create-header-container {
+    background: #0b1220;
+    border-color: #1f2937;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+  }
+  .form-section {
+    background: #0f172a;
+    border-color: #223047;
+  }
+  .page-title { color: #f8fafc; }
+  .form-label, label { color: #93a4bd; }
+  .form-input,
+  input[type="text"],
+  input[type="date"],
+  input[type="time"],
+  input[type="number"],
+  select,
+  textarea {
+    background: #0b1425;
+    color: #e5edff;
+    border-color: #2b3a56;
+  }
+  input[readonly], textarea[readonly] {
+    background: #0b1425;
+    color: #c6d4f5;
+  }
+  .btn-secondary {
+    background: #0b1425;
+    color: #e5edff;
+    border-color: #2b3a56;
+  }
+  .po-entry-card {
+    background: #0b1425;
+    border-color: #223047;
+  }
+  .error-message {
+    background: #2a0f10;
+    border-color: #5b1d20;
+    color: #ff9da4;
+  }
+  .success-content {
+    background: #0f2418;
+    border-color: #185c39;
+    color: #d1f5e0;
+  }
+}

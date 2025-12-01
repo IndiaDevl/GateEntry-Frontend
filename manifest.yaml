@@ -1,0 +1,7 @@
+applications:
+    - name: GateEntry-frontend
+    path: ./dist
+    memory: 64M
+    buildpacks:
+      - staticfile_buildpack
+    default-route: true
