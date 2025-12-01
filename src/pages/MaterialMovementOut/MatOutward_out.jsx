@@ -6,7 +6,7 @@ import {
   createGoodsIssue,
   updateOutboundDelivery,
   fetchGateEntryByNumber
-} from '../../api';
+} from '../../components/Api';
 import './MaterialOutHome.css';
 
 // Helper: ISO timestamp

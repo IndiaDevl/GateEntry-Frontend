@@ -3,7 +3,7 @@ import React, { useState, useEffect, useRef } from "react";
 import { createHeader, createMaterialInward, fetchNextGateNumber, fetchNextWeightDocNumber, sendEmailNotification,fetchPurchaseOrderByPermitNumber ,
     updateMaterialInward,
   fetchWeightDetailsByVendorInvoiceNumber
-} from "../../api";
+} from "../../components/Api";
 import { useLocation } from "react-router-dom";
 import jsQR from "jsqr";
 

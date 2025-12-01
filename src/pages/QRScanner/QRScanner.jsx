@@ -1,6 +1,6 @@
 // Version 6 - Create Gate Entry + Material Inward (Weight Document) together
 import React, { useState, useEffect, useRef } from "react";
-import { createHeader, createMaterialInward, fetchNextGateNumber, fetchNextWeightDocNumber, sendEmailNotification,fetchPurchaseOrderByPermitNumber } from "../../api";
+import { createHeader, createMaterialInward, fetchNextGateNumber, fetchNextWeightDocNumber, sendEmailNotification,fetchPurchaseOrderByPermitNumber } from "../../components/Api";
 import { useLocation } from "react-router-dom";
 import jsQR from "jsqr";
 

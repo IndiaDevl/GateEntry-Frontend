@@ -4,7 +4,7 @@ import {
   updateMaterialInward, // We'll create this to UPDATE existing record
   fetchMaterialInwardByGateNumber, // Fetch existing weight record
   fetchGateEntryByNumber
-} from '../../api';
+} from '../../components/Api';
 import './MaterialOutHome.css';
 
 // Helper: ISO timestamp

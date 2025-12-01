@@ -4,7 +4,7 @@ import {
   createMaterialInward, 
   fetchNextWeightDocNumber,
   fetchGateEntryByNumber  
-} from '../../api';
+} from '../../components/Api';
 import './MaterialINHome.css';
 
 // Helper: ISO timestamp

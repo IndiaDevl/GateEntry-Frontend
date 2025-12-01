@@ -1,5 +1,6 @@
 import React, { useState } from "react";
-import { userCrenditials } from "./api";
+//import { userCrenditials } from "./api";
+import { userCrenditials } from "./components/Api.jsx";
 import { BrowserRouter as Router, Routes, Route, Link, Navigate, useNavigate } from "react-router-dom";
 import InitialRegistration from  "./pages/Gateinmovementin/InitialReg.jsx";
 import QRScannerInward from "./pages/QRScanner/QRScanner.jsx";

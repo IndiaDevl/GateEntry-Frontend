@@ -1,6 +1,6 @@
 // Version 6: Fixed mandatory labels, auto-fill, and inward time
 import React, { useState, useEffect } from "react";
-import { createHeader, fetchNextGateNumber, fetchInitialRegistrations, fetchTruckRegistrations } from "../../api";
+import { createHeader, fetchNextGateNumber, fetchInitialRegistrations, fetchTruckRegistrations } from "../../components/Api";
 import { useLocation } from "react-router-dom";
 //import "./CreateHeader.css";
 

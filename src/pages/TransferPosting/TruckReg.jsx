@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
-import { initialRegistration, fetchInitialRegistrations, updateInitialRegistration, fetchSalesOrderSuggestions } from "../../api";
+import { initialRegistration, fetchInitialRegistrations, updateInitialRegistration, fetchSalesOrderSuggestions } from "../../components/Api";
 import { useLocation } from "react-router-dom";
 //import "./InitialReg.css";
 

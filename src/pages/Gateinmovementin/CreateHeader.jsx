@@ -1,6 +1,6 @@
 // Version 4 Automatic time and date working fine
 import React, { useState, useEffect } from "react";
-import { createHeader, fetchNextGateNumber, fetchPurchaseOrderByNumber } from "../../api";
+import { createHeader, fetchNextGateNumber, fetchPurchaseOrderByNumber } from "../../components/Api";
 import { useLocation } from "react-router-dom";
 import "./CreateHeader.css";
 

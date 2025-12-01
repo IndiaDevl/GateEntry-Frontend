@@ -8,7 +8,7 @@ import {
   updateMaterialInward,
   updateobdMaterialOutward,
   fetchSalesOrderSuggestions
-} from '../../api';
+} from '../../components/Api';
 import './MaterialINHome';
 
 // Helper: ISO timestamp

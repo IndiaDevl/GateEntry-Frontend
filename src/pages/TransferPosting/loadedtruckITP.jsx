@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import api, { fetchGateEntryByNumber, ITPPDFGenerate } from "../../api";
+import api, { fetchGateEntryByNumber, ITPPDFGenerate } from "../../components/Api";
 //import "./GateOutHome.css";
 
 export default function GateEntryOutwardSD() {
