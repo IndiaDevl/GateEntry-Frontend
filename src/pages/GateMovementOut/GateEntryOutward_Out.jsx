@@ -1,6 +1,6 @@
 // Vehicle Out (Departure) - SD focused minimal screen
 import React, { useState, useEffect } from "react";
-import api, { fetchGateEntryByNumber } from "../../components/Api";
+import api, { fetchGateEntryByNumber } from "../../api";
 import "./GateOutHome.css";
 
 export default function GateEntryOutwardSD() {

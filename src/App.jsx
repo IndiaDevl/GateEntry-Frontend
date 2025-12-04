@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 //import { userCrenditials } from "./api";
-import { userCrenditials } from "./components/Api.jsx";
+import { userCrenditials } from "./api.jsx";
 import { BrowserRouter as Router, Routes, Route, Link, Navigate, useNavigate } from "react-router-dom";
 import InitialRegistration from  "./pages/Gateinmovementin/InitialReg.jsx";
 import QRScannerInward from "./pages/QRScanner/QRScanner.jsx";
@@ -57,14 +57,14 @@ const HomePage = () => {
   }}
 >
   <div>
-    <h1 style={{ marginBottom: 8 }}>Gate Entry Screen</h1>
+    <h1 style={{ marginBottom: 20 }}>Gate Entry Screen</h1>
     <nav className="main-nav">
-      <Link to="/home" className="nav-link">Dashboard</Link>
-      <Link to="/home/initial_registration" className="nav-link">Initial Registration</Link>
+      <Link to="/home" className="card-link">Dashboard</Link>
+      <Link to="/home/initial_registration" className="card-link">Initial Registration</Link>
     </nav>
   </div>
   <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 8 }}>
-    <img src="/Minera_Logo.jpg" alt="Minera Logo" style={{ width: "120px" }} />
+    <img src="/Minera_Logo.jpg" alt="Minera Logo" style={{ width: "150px" }} />
     <button
       onClick={() => { localStorage.removeItem("loggedIn"); navigate("/"); }}
       className="logout-btn"
@@ -175,7 +175,7 @@ const LoginPage = () => {
             />
           </div>
           {error && <div className="error-message">{error}</div>}
-          <button type="submit" className="login-btn" disabled={loading}>{loading ? "Logging in..." : "Login"}</button>
+          <button type="submit" className="login-btn" disabled={loading}>{loading ? "Logging" : "Login"}</button>
         </form>
       </div>
     </div>

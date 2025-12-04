@@ -1,6 +1,6 @@
 // Version 6: Fixed mandatory labels, auto-fill, and inward time
 import React, { useState, useEffect } from "react";
-import { createHeader, fetchNextGateNumber, fetchInitialRegistrations, fetchSalesOrderSuggestions } from "../../components/Api";
+import { createHeader, fetchNextGateNumber, fetchInitialRegistrations, fetchSalesOrderSuggestions } from "../../api";
 import { useLocation } from "react-router-dom";
 import "./CreateHeader.css";
 
@@ -34,6 +34,7 @@ export default function Outward() {
     Division: "",
     Remarks: "",
     FiscalYear: currentYear,
+    RegistrationNumber: "",
 
     // Time fields
     InwardTime: "",
@@ -83,8 +84,9 @@ export default function Outward() {
       // Only lookup if we have at least 3 characters in either field
       const sdSearch = header.SalesDocument.trim();
       const vehSearch = header.VehicleNumber.trim();
+      const registrationSearch = header.RegistrationNumber ? header.RegistrationNumber.trim() : ""; 
       
-      if (sdSearch.length < 3 && vehSearch.length < 3) {
+      if (sdSearch.length < 2 && vehSearch.length < 2 && registrationSearch.length < 2) {
         setLookupSuggestions([]);
         setShowSuggestions(false);
         return;
@@ -92,8 +94,11 @@ export default function Outward() {
 
       setLookupLoading(true);
       try {
-        // Search by either Sales Document or Vehicle Number
-        const searchTerm = sdSearch.length >= 3 ? sdSearch : vehSearch;
+        // Search by either Sales Document, Vehicle Number, or Registration Number
+        const searchTerm =
+          sdSearch.length >= 2 ? sdSearch :
+          vehSearch.length >= 2 ? vehSearch :
+          registrationSearch.length >= 2 ? registrationSearch : "";
         const { data } = await fetchInitialRegistrations({ 
           search: searchTerm, 
           top: 10 
@@ -131,6 +136,7 @@ export default function Outward() {
       Material: regData.Material || prev.Material,
       MaterialDescription: regData.MaterialDescription || prev.MaterialDescription,
       VehicleNumber: regData.VehicleNumber || prev.VehicleNumber,
+      RegistrationNumber: regData.RegistrationNumber || prev.RegistrationNumber,
       TransporterName: regData.Transporter || prev.TransporterName,
       BalanceQty: regData.ExpectedQty || prev.BalanceQty,
       Remarks: regData.SAP_Description || prev.Remarks
@@ -386,6 +392,19 @@ export default function Outward() {
               {lookupLoading && <small className="lookup-hint">Searching...</small>}
             </div>
 
+            <div className="form-group lookup-field">
+              <label className="form-label required">Registration Number</label>
+              <input
+                className="form-input"
+                name="RegistrationNumber"
+                value={header.RegistrationNumber}
+                onChange={handleChange}
+                placeholder="Start typing to search..."
+                required
+              />
+              {lookupLoading && <small className="lookup-hint">Searching...</small>}
+            </div>
+
             <div className="form-group">
               <label className="form-label">Transporter Name</label>
               <input
@@ -503,6 +522,7 @@ export default function Outward() {
                     <div className="suggestion-details">
                       <span>Transporter: {reg.Transporter || '-'}</span>
                       <span>Expected Qty: {reg.ExpectedQty || '-'}</span>
+                      <span>Registration Number : {reg.RegistrationNumber || '-'} </span>
                     </div>
                   </div>
                 ))}

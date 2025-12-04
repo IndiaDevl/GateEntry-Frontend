@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
-import { initialRegistration, fetchInitialRegistrations, updateInitialRegistration, fetchSalesOrderSuggestions } from "../../components/Api";
+import { initialRegistration, fetchInitialRegistrations, updateInitialRegistration, fetchSalesOrderSuggestions } from "../../api";
 import { useLocation } from "react-router-dom";
 //import "./InitialReg.css";
 
@@ -135,7 +135,7 @@ export default function InitialRegistration() {
   return (
     <div className="create-header-container initial-reg-wrapper">
       <h2>Truck Registration for Internal Transfer Posting</h2>
-      <form onSubmit={handleSubmit} className="create-header-form">
+      <form onSubmit={handleSubmit} className="create-header-truckreg">
         <div className="form-row-2col">
           <div className="form-group">
             <label>Truck Number</label>

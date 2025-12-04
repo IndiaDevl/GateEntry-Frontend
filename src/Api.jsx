@@ -1,5 +1,5 @@
 import axios from 'axios';
-//export const API_BASE = 'http://localhost:4300/api';
+//export const API_BASE = 'http://localhost:4400/api';
 //export const API_BASE = 'https://gateentry.cfapps.ap21.hana.ondemand.com/api';
 export const API_BASE = 'https://gateentry-backend.onrender.com/api';
 
@@ -182,6 +182,10 @@ export function fetchPurchaseOrderByNumber(poNumber) {
   return api.get(`/purchaseorder/${poNumber}`);
 }
 
+export function fetchPurchaseOrderSuggestions(search) {
+  return api.get(`/po-suggestions?query=${encodeURIComponent(search)}`);
+}
+
 // Fetch PO details by Permit Number (new endpoint)
 export function fetchPurchaseOrderByPermitNumber(permitNumber) {
   return api.get(`/po-permitnumber/${permitNumber}`);
@@ -208,8 +212,11 @@ export function updateOutboundDelivery(deliveryDocument, itemNumber, payload) {
   return api.patch(`/outbounddelivery/${deliveryDocument}/items/${itemNumber}`, payload);
 }
 
-export function createGoodsIssue(payload) {
-  return api.post('/goodsissue-and-invoice', payload);
+// export function createGoodsIssue(payload) {
+//   return api.post('/goodsissue-and-invoice', payload);
+// }
+export function createGoodsIssue(payload, options = {}) {
+  return api.post('/goodsissue-and-invoice', payload, options);
 }
 
 

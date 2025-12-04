@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
-import { initialRegistration, fetchInitialRegistrations, updateInitialRegistration, fetchSalesOrderSuggestions } from "../../components/Api";
+import { initialRegistration, fetchInitialRegistrations, updateInitialRegistration, fetchSalesOrderSuggestions } from "../../api";
 import { useLocation } from "react-router-dom";
 import "./InitialReg.css";
 
@@ -8,6 +8,8 @@ export default function InitialRegistration() {
 
   // Always initialize all fields as string or number (never undefined/null)
   const initialFormState = {
+    RegistrationNumber: "",
+    Indicators: "IR",
     SalesDocument2: "",
     ExpectedQty: "",
     VehicleNumber: "",
@@ -93,8 +95,10 @@ export default function InitialRegistration() {
         ...formData,
         Status: "Success"
       };
-      await initialRegistration(payload);
-      setSuccessMsg(`Initial Registration Successfully!\nSalesOrder Number: ${formData.SalesDocument2} | Vehicle: ${formData.VehicleNumber}`);
+      const res = await initialRegistration(payload);
+      // Get RegistrationNumber from backend response
+      const regNumber = res?.data?.RegistrationNumber || "";
+      setSuccessMsg(`Initial Registration Successfully!\nSalesOrder Number: ${formData.SalesDocument2} | Vehicle: ${formData.VehicleNumber} | Initial Reg Number: ${regNumber}`);
       setFormData(initialFormState);
       if (showList) loadList({ search });
     } catch (error) {
@@ -192,6 +196,7 @@ export default function InitialRegistration() {
                   const soNumber = s.SalesDocument2 || s.SalesOrder || s.SalesDocument || "N/A";
                   const material = s.Material || (s.items && s.items[0]?.Material) || "";
                   const materialDesc = s.MaterialDescription || (s.items && s.items[0]?.MaterialDescription) || "";
+                  const balanceQty = s.BalanceQty || (s.items && s.items[0]?.BalanceQty) || "";
                   return (
                     <li
                       key={soNumber + "_" + i}
@@ -203,16 +208,18 @@ export default function InitialRegistration() {
                           CustomerName: s.CustomerName || "",
                           Material: material,
                           MaterialDescription: materialDesc,
+                          BalanceQty: balanceQty || s.BalanceQty || ""
                         }));
                         setShowSoSuggestions(false);
                       }}
                     >
                       <div>
-                        <strong>SalesDoc: {soNumber}</strong>
+                        <strong>SalesDocument: {soNumber}</strong>
                         {s.Customer && <span style={{marginLeft:8}}>Customer: {s.Customer}</span>}
                         {s.CustomerName && <span style={{marginLeft:8}}>Name: {s.CustomerName}</span>}
                         {material && <span style={{marginLeft:8}}>Material: {material}</span>}
                         {materialDesc && <span style={{marginLeft:8}}>Desc: {materialDesc}</span>}
+                        {balanceQty && <span style={{marginLeft:8}}>Balance Qty: {balanceQty}</span>}
                       </div>
                     </li>
                   );

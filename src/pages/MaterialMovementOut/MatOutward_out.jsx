@@ -6,7 +6,8 @@ import {
   createGoodsIssue,
   updateOutboundDelivery,
   fetchGateEntryByNumber
-} from '../../components/Api';
+} from '../../api';
+import axios from 'axios';
 import './MaterialOutHome.css';
 
 // Helper: ISO timestamp
@@ -275,10 +276,9 @@ const handleGoodsIssue = async () => {
   setResult(null);
   setLoading(true);
   try {
-    // Use OutboundDelivery from form state
     const deliveryDoc = form.OutboundDelivery;
     const netWeight = form.NetWeight;
-    const itemNumber = "10"; // Replace with actual item number if available
+    const itemNumber = "10";
 
     if (!deliveryDoc) {
       setError('No Outbound Delivery number found.');
@@ -294,15 +294,46 @@ const handleGoodsIssue = async () => {
     // 1. Update Outbound Delivery item with Net Weight
     await updateOutboundDelivery(deliveryDoc, itemNumber, {
       ActualDeliveryQuantity: netWeight,
-      // ActualDeliveryQtyUnit: 'EA', // Add unit if required by SAP
     });
 
-    // 2. Create Goods Issue and Billing Document
-    await createGoodsIssue({
-      DeliveryDocument: deliveryDoc
-    });
+    // 2. Create Goods Issue and Billing Document, and get PDF
+const response = await axios.post(
+  'http://localhost:4400/api/goodsissue-and-invoice',
+  { DeliveryDocument: deliveryDoc },
+  { responseType: 'blob' }
+);
 
-    setResult('Outbound Delivery updated and Goods Issue + Billing Document created successfully!');
+const goodsIssueNumber = response.headers['x-goods-issue-number'];
+const billingDocumentNumber = response.headers['x-billing-document-number'];
+
+    // Download PDF
+    const contentType = response.headers['content-type'];
+if (contentType && contentType.includes('application/pdf')) {
+  // Create a Blob from the PDF Stream
+  const pdfBlob = new Blob([response.data], { type: 'application/pdf' });
+  // Create a link element, use it to download, and then remove it
+  const url = window.URL.createObjectURL(pdfBlob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.setAttribute('download', 'GoodsIssueBilling.pdf');
+  document.body.appendChild(link);
+  link.click();
+  link.parentNode.removeChild(link);
+} else {
+  // Try to read the error message
+  const reader = new FileReader();
+  reader.onload = function() {
+    setError(reader.result || 'Failed to download PDF');
+  };
+  reader.readAsText(response.data);
+  return;
+}
+
+    setResult(
+      `Outbound Delivery updated and Goods Issue + Billing Document created successfully! 
+      Goods Issue No: ${goodsIssueNumber || 'N/A'}, 
+      Billing Doc No: ${billingDocumentNumber || 'N/A'}`
+    );
   } catch (err) {
     setError(
       err?.response?.data?.error?.message?.value ||

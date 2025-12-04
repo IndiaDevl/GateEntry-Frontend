@@ -1,29 +1,16 @@
-// Version 4 Automatic time and date working fine
-import React, { useState, useEffect } from "react";
-import { createHeader, fetchNextGateNumber, fetchPurchaseOrderByNumber } from "../../components/Api";
+
+import React, { useState, useEffect, useRef } from "react";
+import { createHeader, fetchNextGateNumber, fetchPurchaseOrderByNumber, fetchPurchaseOrderSuggestions } from "../../api";
 import { useLocation } from "react-router-dom";
 import "./CreateHeader.css";
-
 
 export default function CreateHeader() {
   const currentDate = new Date().toISOString().split('T')[0];
   const currentYear = new Date().getFullYear().toString();
 
-  // Helper: Format current time into SAP duration string e.g. PT16H42M16S
-  const formatTimeToSapDuration = (date = new Date()) => {
-    const hh = String(date.getHours()).padStart(2, '0');
-    const mm = String(date.getMinutes()).padStart(2, '0');
-    const ss = String(date.getSeconds()).padStart(2, '0');
-    return `PT${hh}H${mm}M${ss}S`;
-  };
-
-  // Helper: Full ISO timestamp (UTC) for SAP_CreatedDateTime
-  const nowIso = (date = new Date()) => date.toISOString();
-
-  // Create initial state function to avoid reference issues
+  // Create initial state function
   const createInitialHeaderState = () => {
     const initialState = {
-      // Header fields
       GateEntryNumber: "",
       GateEntryDate: currentDate,
       Indicators: "I",
@@ -39,18 +26,13 @@ export default function CreateHeader() {
       Remarks: "",
       SubTransporterName: "",
       FiscalYear: currentYear,
-
-      // automatic timestamps
       InwardTime: new Date().toISOString().includes('T')
         ? `${new Date().getHours().toString().padStart(2, '0')}:${new Date().getMinutes().toString().padStart(2, '0')}:${new Date().getSeconds().toString().padStart(2, '0')}`
         : '',
-      OutwardTime: new Date().toISOString().includes('T')
-        ? `${new Date().getHours().toString().padStart(2, '0')}:${new Date().getMinutes().toString().padStart(2, '0')}:${new Date().getSeconds().toString().padStart(2, '0')}`
-        : '',
+      OutwardTime: "",
       SAP_CreatedDateTime: new Date().toISOString(),
     };
 
-    // Add PO fields dynamically
     for (let i = 1; i <= 5; i++) {
       const suffix = i === 1 ? "" : String(i);
       initialState[`PurchaseOrderNumber${suffix}`] = "";
@@ -73,8 +55,17 @@ export default function CreateHeader() {
   const [error, setError] = useState(null);
   const [result, setResult] = useState(null);
   const [poLoading, setPoLoading] = useState({});
+  const [lastCreated, setLastCreated] = useState(null);
   
-  // New state for PO item selection
+  // New states for two-step PO selection
+  const [poSelectionModal, setPoSelectionModal] = useState({
+    show: false,
+    poList: [],
+    suffix: '',
+    searchQuery: '',
+    loading: false
+  });
+
   const [poItemsModal, setPoItemsModal] = useState({
     show: false,
     items: [],
@@ -83,12 +74,22 @@ export default function CreateHeader() {
     headerData: null
   });
 
-  const [lastCreated, setLastCreated] = useState(null);
+  // Refs for debouncing
+  const searchTimeoutRef = useRef(null);
+
+  // Helper functions
+  const formatTimeToSapDuration = (date = new Date()) => {
+    const hh = String(date.getHours()).padStart(2, '0');
+    const mm = String(date.getMinutes()).padStart(2, '0');
+    const ss = String(date.getSeconds()).padStart(2, '0');
+    return `PT${hh}H${mm}M${ss}S`;
+  };
+
+  const nowIso = (date = new Date()) => date.toISOString();
 
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target;
 
-    // Special handling for numeric fields to allow decimals
     if (name.includes('VendorInvoiceWeight') || name.includes('BalanceQty')) {
       if (value === '' || /^-?\d*\.?\d*$/.test(value)) {
         setHeader(prev => ({ ...prev, [name]: value }));
@@ -101,73 +102,129 @@ export default function CreateHeader() {
     }
   };
 
-  // NEW: Handle PO Number Change with Item Selection
+  // ============================================
+  // NEW: Enhanced PO Number Change Handler
+  // ============================================
   const handlePONumberChange = async (e, suffix) => {
     const { value } = e.target;
     const poFieldName = `PurchaseOrderNumber${suffix}`;
+    
+    // Update the field immediately
     setHeader(prev => ({ ...prev, [poFieldName]: value }));
 
-    // If PO number is empty, clear related fields
+    // Clear related fields if value is empty
     if (!value || value.trim() === '') {
-      setHeader(prev => ({
-        ...prev,
-        [`Material${suffix}`]: '',
-        [`MaterialDescription${suffix}`]: '',
-        [`Vendor${suffix}`]: '',
-        [`VendorName${suffix}`]: '',
-        [`BalanceQty${suffix}`]: ''
-      }));
+      clearPOFields(suffix);
       return;
     }
 
+    // Clear any existing timeout
+    if (searchTimeoutRef.current) {
+      clearTimeout(searchTimeoutRef.current);
+    }
+
+    // Set loading state
     setPoLoading(prev => ({ ...prev, [suffix]: true }));
 
+    // Debounce the search
+    searchTimeoutRef.current = setTimeout(async () => {
+      try {
+        // If value is short (1-3 chars), show PO selection modal
+        if (value.length >= 1 && value.length <= 10) {
+          await fetchAndShowPOList(value, suffix);
+          return;
+        }
+
+        // If full PO number (>=4 chars), fetch directly
+        if (value.length >= 10) {
+          await fetchAndShowPOItems(value, suffix, true);
+        }
+      } catch (err) {
+        console.error('Error in PO handling:', err);
+        alert(`Error: ${err?.message || 'Failed to process PO'}`);
+      } finally {
+        setPoLoading(prev => ({ ...prev, [suffix]: false }));
+      }
+    }, 500); // 500ms debounce
+  };
+
+  // ============================================
+  // NEW: Function to fetch and show PO list
+  // ============================================
+  const fetchAndShowPOList = async (query, suffix) => {
+    setPoSelectionModal(prev => ({ ...prev, loading: true }));
+    
     try {
-      // If value is short, fetch a list of matching POs
-      if (value.length < 4) {
-        // You need a backend endpoint like /api/po-suggestions?query=xx
-        const response = await fetchPurchaseOrderSuggestions(value);
-        // Show a modal or dropdown for user to pick a PO
-        setPoItemsModal({
+      const response = await fetchPurchaseOrderSuggestions(query);
+      console.log('PO Suggestions received:', response.data);
+      
+      if (response.data.items && response.data.items.length > 0) {
+        setPoSelectionModal({
           show: true,
-          items: response.data.items || [],
-          suffix,
-          poNumber: value,
-          headerData: null
+          poList: response.data.items,
+          suffix: suffix,
+          searchQuery: query,
+          loading: false
         });
-        return;
+      } else {
+        alert(`No POs found starting with "${query}"`);
+        setPoSelectionModal(prev => ({ ...prev, loading: false }));
+        clearPOFields(suffix);
+      }
+    } catch (err) {
+      console.error('Error fetching PO suggestions:', err);
+      setPoSelectionModal(prev => ({ ...prev, loading: false }));
+      alert('Failed to fetch PO list. Please try again.');
+    }
+  };
+
+  // ============================================
+  // NEW: Function to fetch and show PO line items
+  // ============================================
+  const fetchAndShowPOItems = async (poNumber, suffix, shouldUpdateField = false) => {
+    try {
+      if (shouldUpdateField) {
+        setHeader(prev => ({ 
+          ...prev, 
+          [`PurchaseOrderNumber${suffix}`]: poNumber 
+        }));
       }
 
-      // Otherwise, fetch the full PO details as before
-      const response = await fetchPurchaseOrderByNumber(value);
+      const response = await fetchPurchaseOrderByNumber(poNumber);
       const poData = response.data;
       
       console.log('PO Data received:', poData);
       
       const items = poData.items || [];
-
       const availableItems = items.filter((it) => {
         const mat = it.Material || it.material || '';
-        const rem = getRemainingFor(value, mat);
-        // If we have a stored remaining and it's <= 0, hide it
+        const rem = getRemainingFor(poNumber, mat);
         return !(Number.isFinite(rem) && rem <= 0);
       });
 
       if (availableItems.length === 0) {
-        alert(`All items for PO ${value} are completed (remaining 0).`);
-        setPoLoading(prev => ({ ...prev, [suffix]: false }));
+        // Instead of alert, set a completed badge/message for this PO entry
+        setHeader(prev => ({
+          ...prev,
+          [`Material${suffix}`]: '',
+          [`MaterialDescription${suffix}`]: '',
+          [`Vendor${suffix}`]: '',
+          [`VendorName${suffix}`]: '',
+          [`BalanceQty${suffix}`]: 0,
+          [`__POCompletedMsg${suffix}`]: `All items for PO ${poNumber} are completed (remaining 0)`
+        }));
         return;
       }
 
-      // If only one available item, auto-fill; else open modal with filtered list
+      // If only one item, auto-fill; otherwise show selection modal
       if (availableItems.length === 1) {
         fillPOFields(suffix, availableItems[0], poData);
       } else {
         setPoItemsModal({
           show: true,
           items: availableItems,
-          suffix,
-          poNumber: value,
+          suffix: suffix,
+          poNumber: poNumber,
           headerData: poData
         });
       }
@@ -176,12 +233,52 @@ export default function CreateHeader() {
       console.error('Error fetching PO details:', err);
       const errorMsg = err?.response?.data?.error || err?.message || 'Failed to fetch PO details';
       alert(`Error loading PO: ${errorMsg}`);
-    } finally {
-      setPoLoading(prev => ({ ...prev, [suffix]: false }));
+      clearPOFields(suffix);
     }
   };
 
-  // NEW: Fill PO fields with selected item data
+  // ============================================
+  // NEW: Handle PO selection from PO list modal
+  // ============================================
+  const handleSelectPOFromList = (selectedPO) => {
+    const { suffix } = poSelectionModal;
+    
+    // Update the PO number in the form
+    setHeader(prev => ({
+      ...prev,
+      [`PurchaseOrderNumber${suffix}`]: selectedPO.PurchaseOrder
+    }));
+    
+    // Close PO selection modal
+    setPoSelectionModal({
+      show: false,
+      poList: [],
+      suffix: '',
+      searchQuery: '',
+      loading: false
+    });
+    
+    // Fetch line items for the selected PO
+    fetchAndShowPOItems(selectedPO.PurchaseOrder, suffix, false);
+  };
+
+  // ============================================
+  // Helper Functions
+  // ============================================
+  const clearPOFields = (suffix) => {
+    const fieldsToClear = [
+      'Material', 'MaterialDescription', 'Vendor', 'VendorName',
+      'BalanceQty', 'VendorInvoiceNumber', 'VendorInvoiceDate', 'VendorInvoiceWeight'
+    ];
+    
+    const updates = {};
+    fieldsToClear.forEach(field => {
+      updates[`${field}${suffix}`] = '';
+    });
+    
+    setHeader(prev => ({ ...prev, ...updates }));
+  };
+
   const fillPOFields = (suffix, item, headerData) => {
     const supplierCode = headerData?.Supplier || headerData?.supplier || '';
     const supplierName = headerData?.SupplierName || headerData?.supplierName || '';
@@ -191,15 +288,12 @@ export default function CreateHeader() {
     const orderQtyNum = toNum(item.OrderQuantity || item.orderQuantity);
 
     setHeader(prev => {
-      const poNo =
-        prev[`PurchaseOrderNumber${suffix}`] ||
-        headerData?.PurchaseOrder || headerData?.purchaseOrder || '';
-
+      const poNo = prev[`PurchaseOrderNumber${suffix}`] || headerData?.PurchaseOrder || '';
       const storedRemaining = getRemainingFor(poNo, material);
-      // initialRemaining: prefer stored; else use PO order qty; else blank
-      const initialRemaining =
-        Number.isFinite(storedRemaining) ? storedRemaining :
-        (Number.isFinite(orderQtyNum) ? orderQtyNum : '');
+      
+      const initialRemaining = Number.isFinite(storedRemaining) 
+        ? storedRemaining 
+        : (Number.isFinite(orderQtyNum) ? orderQtyNum : '');
 
       return {
         ...prev,
@@ -212,26 +306,32 @@ export default function CreateHeader() {
     });
   };
 
-  // NEW: Handle PO Item Selection from Modal
   const handleSelectPOItem = (item) => {
     fillPOFields(poItemsModal.suffix, item, poItemsModal.headerData);
     setPoItemsModal({ show: false, items: [], suffix: '', poNumber: '', headerData: null });
   };
 
-  // NEW: Close Modal
-  const closeModal = () => {
+  const closePOListModal = () => {
+    setPoSelectionModal({ show: false, poList: [], suffix: '', searchQuery: '', loading: false });
+  };
+
+  const closePOItemsModal = () => {
     setPoItemsModal({ show: false, items: [], suffix: '', poNumber: '', headerData: null });
   };
 
-
-  // Only update FiscalYear when GateEntryDate changes
+  // Cleanup on unmount
   useEffect(() => {
-    if (header.GateEntryDate) {
-      const year = header.GateEntryDate.slice(0, 4);
-      setHeader(prev => ({ ...prev, FiscalYear: year }));
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [header.GateEntryDate]);
+    return () => {
+      if (searchTimeoutRef.current) {
+        clearTimeout(searchTimeoutRef.current);
+      }
+    };
+  }, []);
+
+  // Rest of your existing code (transformDataForAPI, handleSubmit, etc.)
+  // ============================================
+  // [Keep all your existing functions below - they remain the same]
+  // ============================================
 
   const transformDataForAPI = (data) => {
     const transformed = { ...data };
@@ -286,7 +386,7 @@ export default function CreateHeader() {
     setError(null);
     setResult(null);
 
-    // Validation: check remaining quantities vs entered weights
+    // Validation
     const validationErrors = [];
     for (let i = 1; i <= 5; i++) {
       const s = i === 1 ? '' : String(i);
@@ -312,7 +412,6 @@ export default function CreateHeader() {
 
     try {
       let gateEntryNumber = header.GateEntryNumber;
-      // Only generate GateEntryNumber on Save
       if (!gateEntryNumber) {
         const year = header.GateEntryDate ? header.GateEntryDate.slice(0, 4) : currentYear;
         const resp = await fetchNextGateNumber(year, series);
@@ -339,14 +438,13 @@ export default function CreateHeader() {
       const response = await createHeader(payload);
       setResult('Gate entry created successfully');
 
-      // Snapshot details BEFORE reset so they show in success message
       setLastCreated({
         gateEntryNumber: gateEntryNumber,
         date: header.GateEntryDate,
         vehicle: header.VehicleNumber
       });
 
-      // Persist updated PO remaining locally
+      // Update remaining quantities
       for (let i = 1; i <= 5; i++) {
         const s = i === 1 ? '' : String(i);
         const poNo = header[`PurchaseOrderNumber${s}`];
@@ -354,8 +452,8 @@ export default function CreateHeader() {
         if (!poNo || !material) continue;
 
         const prevRemainingStored = getRemainingFor(poNo, material);
-        const formBalance = toNum(header[`BalanceQty${s}`]); // what the form shows now
-        const received = toNum(header[`VendorInvoiceWeight${s}`]); // prioritize this
+        const formBalance = toNum(header[`BalanceQty${s}`]);
+        const received = toNum(header[`VendorInvoiceWeight${s}`]);
 
         const prevRemaining = Number.isFinite(prevRemainingStored)
           ? prevRemainingStored
@@ -367,20 +465,17 @@ export default function CreateHeader() {
         if (Number.isFinite(received) && received > 0) {
           consumed = received;
         } else if (Number.isFinite(formBalance) && formBalance < prevRemaining) {
-          consumed = prevRemaining - formBalance; // user manually reduced balance
+          consumed = prevRemaining - formBalance;
         }
 
         const newRemaining = Math.max(0, prevRemaining - consumed);
         setRemainingFor(poNo, material, newRemaining);
       }
 
-      // Optionally clear success after a few seconds
-      setTimeout(() => setResult(null),20000);
-
-      // IMPORTANT: reset fields but KEEP the success message
+      setTimeout(() => setResult(null), 20000);
       resetForm({ keepMessages: true });
     } catch (err) {
-      console.error('Submit error - full response:', err?.response?.data || err);
+      console.error('Submit error:', err?.response?.data || err);
       const msg = extractErrorMessage(err);
       setError(msg);
     } finally {
@@ -397,12 +492,11 @@ export default function CreateHeader() {
     }
   };
 
-  // detect mode from URL path (inward / outward)
+  // Mode detection
   const location = useLocation();
-  const pathTail = location.pathname.split("/").pop(); // "inward" or "outward" or "create"
+  const pathTail = location.pathname.split("/").pop();
   const mode = pathTail === "inward" ? "inward" : (pathTail === "outward" ? "outward" : "default");
 
-  // if mode is inward, ensure OutwardTime is null and InwardTime set to current HH:mm:ss
   useEffect(() => {
     if (mode === "inward") {
       const hh = String(new Date().getHours()).padStart(2, "0");
@@ -411,13 +505,20 @@ export default function CreateHeader() {
       setHeader(h => ({ ...h, InwardTime: `${hh}:${mm}:${ss}`, OutwardTime: "" }));
     }
     if (mode === "outward") {
-      // For outward you might want to leave InwardTime and set OutwardTime at submit
       setHeader(h => ({ ...h, OutwardTime: "" }));
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mode]);
 
-  // update the title shown to user
+  useEffect(() => {
+    if (header.GateEntryDate) {
+      const year = header.GateEntryDate.slice(0, 4);
+      setHeader(prev => ({ ...prev, FiscalYear: year }));
+    }
+  }, [header.GateEntryDate]);
+
+  // ============================================
+  // JSX Render
+  // ============================================
   return (
     <div className="create-header-container">
       <h2 className="page-title">
@@ -456,11 +557,13 @@ export default function CreateHeader() {
             <div className="form-group">
               <label className="form-label">Series</label>
               <select className="form-select" value={series} onChange={(e) => setSeries(e.target.value)}>
-                {/* <option value="1">SD Series</option> */}
                 <option value="2">MM</option>
               </select>
             </div>
 
+            {/* ... rest of header fields ... */}
+            {/* Keep your existing header fields exactly as they were */}
+            
             <div className="form-group">
               <label className="form-label">Vehicle Number *</label>
               <input
@@ -512,7 +615,6 @@ export default function CreateHeader() {
               />
             </div>
 
-            
             <div className="form-group">
               <label className="form-label">LR/GC Number</label>
               <input
@@ -569,7 +671,7 @@ export default function CreateHeader() {
             </div>
 
             <div className="form-group">
-              <label className="form-label">Outward Time (will be set at submit)</label>
+              <label className="form-label">Outward Time</label>
               <input
                 className="form-input"
                 name="OutwardTime"
@@ -597,40 +699,42 @@ export default function CreateHeader() {
             const suffix = idx === 0 ? "" : String(idx + 1);
             return (
               <div key={idx} className="po-entry-card">
-                <h4 className="po-entry-title">PO Entry {idx + 1}</h4>
+                <h4 className="po-entry-title">Purchase Order Entry {idx + 1}</h4>
                 <div className="grid-4-cols">
                   <div className="form-group">
-                    <label className="form-label">PO Number</label>
-                    <div style={{ position: 'relative' }}>
+                    <label className="form-label">Purchase Order Number</label>
+                    <div className="po-input-wrapper">
                       <input
                         className="form-input"
                         name={`PurchaseOrderNumber${suffix}`}
                         value={header[`PurchaseOrderNumber${suffix}`]}
                         onChange={(e) => handlePONumberChange(e, suffix)}
-                        placeholder="Enter PO and press Tab"
+                        placeholder="Purchase Order Number"
                         style={{
-                          paddingRight: poLoading[suffix] ? '40px' : '12px'
+                          paddingRight: poLoading[suffix] ? '40px' : '12px',
+                          fontSize: '1.1em',
+                          width: '240px',
+                          minWidth: '120px',
+                          maxWidth: '250px'
                         }}
                       />
                       {poLoading[suffix] && (
-                        <div style={{
-                          position: 'absolute',
-                          right: '12px',
-                          top: '50%',
-                          transform: 'translateY(-50%)',
-                          width: '20px',
-                          height: '20px',
-                          border: '2px solid #3b82f6',
-                          borderTopColor: 'transparent',
-                          borderRadius: '50%',
-                          animation: 'spin 0.8s linear infinite'
-                        }} />
+                        <div className="po-loading-spinner" />
                       )}
                     </div>
+                    {/* <small className="po-hint">
+
+                    </small> */}
+                    {header[`__POCompletedMsg${suffix}`] && (
+                      <div className="po-completed-badge" style={{ color: '#b91c1c', fontWeight: 500, marginTop: 4 }}>
+                        {header[`__POCompletedMsg${suffix}`]}
+                      </div>
+                    )}
                   </div>
 
+                  {/* ... rest of PO fields (keep as is) ... */}
                   <div className="form-group">
-                    <label className="form-label">Material</label>
+                    <label className="form-label">Material Code</label>
                     <input
                       className="form-input"
                       name={`Material${suffix}`}
@@ -654,7 +758,7 @@ export default function CreateHeader() {
                   </div>
 
                   <div className="form-group">
-                    <label className="form-label">Vendor</label>
+                    <label className="form-label">Vendor Code</label>
                     <input
                       className="form-input"
                       name={`Vendor${suffix}`}
@@ -711,7 +815,7 @@ export default function CreateHeader() {
                   </div>
 
                   <div className="form-group">
-                    <label className="form-label">Balance Quantity (from PO)</label>
+                    <label className="form-label">PO Balance Quantity</label>
                     <input
                       className="form-input"
                       name={`BalanceQty${suffix}`}
@@ -724,7 +828,7 @@ export default function CreateHeader() {
                       style={toNum(header[`BalanceQty${suffix}`]) === 0 ? { backgroundColor: '#ffe5e5' } : {}}
                     />
                     {toNum(header[`BalanceQty${suffix}`]) === 0 && (
-                      <span style={{ color: 'red', fontSize: '12px' }}>
+                      <span className="po-completed-badge">
                         Completed: No remaining quantity
                       </span>
                     )}
@@ -757,47 +861,126 @@ export default function CreateHeader() {
         </div>
       </form>
 
-      {/* PO Items Selection Modal */}
-      {poItemsModal.show && (
-        <div className="modal-overlay" onClick={closeModal}>
-          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
-            <div className="modal-header">
-              <h3>Select PO Line Item - PO: {poItemsModal.poNumber}</h3>
-              <button className="modal-close" onClick={closeModal}>&times;</button>
+      {/* ============================================
+          MODAL 1: PO Selection (First Step)
+      ============================================ */}
+      {poSelectionModal.show && (
+        <div className="modal-overlay" onClick={closePOListModal}>
+          <div className="modal-content po-modal-small" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header" style={{ padding: '10px 16px' }}>
+              <h3 style={{ fontSize: '1.1em', margin: 0 }}>Select Purchase Order</h3>
+              <p className="modal-subtitle" style={{ fontSize: '0.95em', margin: '4px 0 0 0' }}>
+                Found {poSelectionModal.poList.length} PO(s) starting with "{poSelectionModal.searchQuery}"
+              </p>
+              <button className="modal-close" style={{ fontSize: '1.2em' }} onClick={closePOListModal}>&times;</button>
             </div>
-            <div className="modal-body">
-              <table className="po-items-table">
-                <thead>
-                  <tr>
-                    <th>Item</th>
-                    <th>Material</th>
-                    <th>Description</th>
-                    <th>Quantity</th>
-                    <th>Unit</th>
-                    <th>Action</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {poItemsModal.items.map((item, index) => (
-                    <tr key={index}>
-                      <td>{item.PurchaseOrderItem || item.purchaseOrderItem || index + 1}</td>
-                      <td>{item.Material || item.material || '-'}</td>
-                      <td>{item.PurchaseOrderItemText || item.MaterialDescription || item.materialDescription || '-'}</td>
-                      <td>{item.OrderQuantity || item.orderQuantity || '0'}</td>
-                      <td>{item.OrderQuantityUnit || item.PurchaseOrderQuantityUnit || 'KG'}</td>
-                      <td>
+            <div className="modal-body" style={{ padding: '10px 16px' }}>
+              {poSelectionModal.loading ? (
+                <div className="modal-loading">
+                  <div className="spinner"></div>
+                  <p>Loading POs...</p>
+                </div>
+              ) : (
+                <div className="po-list-container" style={{ maxHeight: 260, overflowY: 'auto', minWidth: 260, maxWidth: 340 }}>
+                  {poSelectionModal.poList.map((po, index) => (
+                    <div key={index} className="po-card" style={{ padding: 8, margin: '6px 0', border: '1px solid #e5e7eb', borderRadius: 6, background: '#f9fafb', cursor: 'pointer' }} onClick={() => handleSelectPOFromList(po)}>
+                      <div className="po-card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <span style={{ fontWeight: 600 }}>{po.PurchaseOrder}</span>
+                        <span className="po-date" style={{ fontSize: '0.9em', color: '#666' }}>
+                          {po.PurchaseOrderDate ? new Date(po.PurchaseOrderDate).toLocaleDateString() : 'N/A'}
+                        </span>
+                      </div>
+                      <div className="po-card-body" style={{ fontSize: '0.97em', color: '#444' }}>
+                        <span><strong>Supplier:</strong> {po.Supplier} - {po.SupplierName}</span>
+                      </div>
+                      <div className="po-card-footer" style={{ textAlign: 'right' }}>
                         <button
                           type="button"
-                          className="btn-select-item"
-                          onClick={() => handleSelectPOItem(item)}
+                          className="btn-select-po"
+                          style={{ fontSize: '0.95em', padding: '2px 10px', borderRadius: 4, background: '#2563eb', color: '#fff', border: 'none', cursor: 'pointer' }}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleSelectPOFromList(po);
+                          }}
                         >
-                          Select
+                          Select PO
                         </button>
-                      </td>
-                    </tr>
+                      </div>
+                    </div>
                   ))}
-                </tbody>
-              </table>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ============================================
+          MODAL 2: Line Items Selection (Second Step)
+      ============================================ */}
+      {poItemsModal.show && (
+        <div className="modal-overlay" onClick={closePOItemsModal}>
+          <div className="modal-content modal-large" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h3>Select Line Item - PO: {poItemsModal.poNumber}</h3>
+              <p className="modal-subtitle">{poItemsModal.items.length} line item(s) available</p>
+              <button className="modal-close" onClick={closePOItemsModal}>&times;</button>
+            </div>
+            <div className="modal-body">
+              <div className="table-container">
+                <table className="po-items-table">
+                  <thead>
+                    <tr>
+                      <th>Item No</th>
+                      <th>Material</th>
+                      <th>Description</th>
+                      <th>Order Qty</th>
+                      <th>Unit</th>
+                      <th>Remaining</th>
+                      <th>Action</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {poItemsModal.items.map((item, index) => {
+                      const material = item.Material || item.material || '';
+                      const remaining = getRemainingFor(poItemsModal.poNumber, material);
+                      const orderQty = toNum(item.OrderQuantity || item.orderQuantity);
+                      
+                      return (
+                        <tr key={index} className={remaining === 0 ? 'row-completed' : ''}>
+                          <td>{item.PurchaseOrderItem || item.purchaseOrderItem || index + 1}</td>
+                          <td>{material}</td>
+                          <td title={item.PurchaseOrderItemText || item.MaterialDescription || item.materialDescription || '-'}>
+                            {item.PurchaseOrderItemText || item.MaterialDescription || item.materialDescription || '-'}
+                          </td>
+                          <td>{orderQty.toLocaleString()}</td>
+                          <td>{item.OrderQuantityUnit || item.PurchaseOrderQuantityUnit || 'KG'}</td>
+                          <td>
+                            {Number.isFinite(remaining) ? (
+                              <span className={remaining === 0 ? 'badge-completed' : 'badge-available'}>
+                                {remaining.toLocaleString()}
+                              </span>
+                            ) : (
+                              <span className="badge-unknown">Unknown</span>
+                            )}
+                          </td>
+                          <td>
+                            <button
+                              type="button"
+                              className={`btn-select-item ${remaining === 0 ? 'disabled' : ''}`}
+                              onClick={() => handleSelectPOItem(item)}
+                              disabled={remaining === 0}
+                              title={remaining === 0 ? 'Item fully consumed' : 'Select this item'}
+                            >
+                              {remaining === 0 ? 'Completed' : 'Select'}
+                            </button>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
             </div>
           </div>
         </div>
@@ -810,25 +993,25 @@ export default function CreateHeader() {
       )}
 
       {result && (
-  <div className="success-message">
-    <div className="success-header">
-      <svg viewBox="0 0 24 24" width="24" height="24">
-        <path fill="currentColor" d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/>
-      </svg>
-      <h3>Gate Entry Created Successfully!</h3>
-    </div>
-    <div className="success-content">
-      <p>Gate Entry Number: <strong>{lastCreated?.gateEntryNumber || header.GateEntryNumber}</strong></p>
-      <p>Date: {lastCreated?.date || header.GateEntryDate}</p>
-      <p>Vehicle: {lastCreated?.vehicle || header.VehicleNumber}</p>
-    </div>
-  </div>
-)}
+        <div className="success-message">
+          <div className="success-header">
+            <svg viewBox="0 0 24 24" width="24" height="24">
+              <path fill="currentColor" d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/>
+            </svg>
+            <h3>Gate Entry Created Successfully!</h3>
+          </div>
+          <div className="success-content">
+            <p>Gate Entry Number: <strong>{lastCreated?.gateEntryNumber || header.GateEntryNumber}</strong></p>
+            <p>Date: {lastCreated?.date || header.GateEntryDate}</p>
+            <p>Vehicle: {lastCreated?.vehicle || header.VehicleNumber}</p>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
 
-// Local persistence for remaining qty per PO + Material (browser-only, no backend change)
+// Utility functions (keep at bottom)
 const poKey = (poNo, material) => `${String(poNo || '').trim()}__${String(material || '').trim()}`;
 
 const getRemainingMap = () => {
@@ -847,7 +1030,7 @@ const setRemainingFor = (poNo, material, qty) => {
     const map = getRemainingMap();
     const key = poKey(poNo, material);
     if (!Number.isFinite(qty) || qty <= 0) {
-      delete map[key]; // 0 or invalid → treat as completed; don't auto-fill next time
+      delete map[key];
     } else {
       map[key] = qty;
     }
