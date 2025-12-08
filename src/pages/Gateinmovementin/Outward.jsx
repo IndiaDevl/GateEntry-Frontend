@@ -8,6 +8,13 @@ export default function Outward() {
   const currentDate = new Date().toISOString().split('T')[0];
   const currentYear = new Date().getFullYear().toString();
 
+  // Helper: Transform header data for API submission
+  const transformDataForAPI = (header) => {
+    // You can customize this function as needed for your API
+    // For now, just return the header object as-is
+    return { ...header };
+  };
+
   // Helper: Format current time into SAP duration string e.g. PT16H42M16S
   const formatTimeToSapDuration = (date = new Date()) => {
     const hh = String(date.getHours()).padStart(2, '0');
@@ -60,6 +67,7 @@ export default function Outward() {
   const [lookupSuggestions, setLookupSuggestions] = useState([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [lookupLoading, setLookupLoading] = useState(false);
+  const [selectedRegNumber, setSelectedRegNumber] = useState(""); // New state for selected registration number
 
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target;
@@ -78,37 +86,24 @@ export default function Outward() {
     }
   };
 
-  // Auto-lookup Initial Registration when Sales Document or Vehicle Number changes
+  // Auto-lookup Initial Registration ONLY when Registration Number changes
   useEffect(() => {
     const lookupInitialReg = async () => {
-      // Only lookup if we have at least 3 characters in either field
-      const sdSearch = header.SalesDocument.trim();
-      const vehSearch = header.VehicleNumber.trim();
-      const registrationSearch = header.RegistrationNumber ? header.RegistrationNumber.trim() : ""; 
-      
-      if (sdSearch.length < 2 && vehSearch.length < 2 && registrationSearch.length < 2) {
+      const registrationSearch = header.RegistrationNumber.trim();
+      if (registrationSearch.length < 2) {
         setLookupSuggestions([]);
         setShowSuggestions(false);
         return;
       }
-
       setLookupLoading(true);
       try {
-        // Search by either Sales Document, Vehicle Number, or Registration Number
-        const searchTerm =
-          sdSearch.length >= 2 ? sdSearch :
-          vehSearch.length >= 2 ? vehSearch :
-          registrationSearch.length >= 2 ? registrationSearch : "";
         const { data } = await fetchInitialRegistrations({ 
-          search: searchTerm, 
-          top: 10 
+          search: registrationSearch, 
+          top: 10 // Show up to 10 matches for dropdown
         });
-        
         const results = data?.d?.results || [];
-        
         // Filter to only show Success status registrations
         const successResults = results.filter(r => r.Status === "Success");
-        
         setLookupSuggestions(successResults);
         setShowSuggestions(successResults.length > 0);
       } catch (err) {
@@ -119,27 +114,26 @@ export default function Outward() {
         setLookupLoading(false);
       }
     };
-
     // Debounce the lookup
     const timeoutId = setTimeout(lookupInitialReg, 500);
     return () => clearTimeout(timeoutId);
-  }, [header.SalesDocument, header.VehicleNumber]);
+  }, [header.RegistrationNumber]);
 
-  // Function to apply selected Initial Registration data
+  // Function to apply selected Initial Registration data (auto-fill all fields)
   const applyInitialRegData = (regData) => {
     console.log('[DEBUG] Applying Initial Registration data:', regData);
     setHeader(prev => ({
       ...prev,
-      SalesDocument: regData.SalesDocument2 || prev.SalesDocument,
-      Customer: regData.Customer || prev.Customer,
-      CustomerName: regData.CustomerName || prev.CustomerName,
-      Material: regData.Material || prev.Material,
-      MaterialDescription: regData.MaterialDescription || prev.MaterialDescription,
-      VehicleNumber: regData.VehicleNumber || prev.VehicleNumber,
+      SalesDocument: regData.SalesDocument2 || '',
+      Customer: regData.Customer || '',
+      CustomerName: regData.CustomerName || '',
+      Material: regData.Material || '',
+      MaterialDescription: regData.MaterialDescription || '',
+      VehicleNumber: regData.VehicleNumber || '',
       RegistrationNumber: regData.RegistrationNumber || prev.RegistrationNumber,
-      TransporterName: regData.Transporter || prev.TransporterName,
-      BalanceQty: regData.ExpectedQty || prev.BalanceQty,
-      Remarks: regData.SAP_Description || prev.Remarks
+      TransporterName: regData.Transporter || '',
+      BalanceQty: regData.ExpectedQty || '',
+      Remarks: regData.SAP_Description || ''
     }));
     setShowSuggestions(false);
   };
@@ -182,30 +176,6 @@ export default function Outward() {
       }));
     }
   }, [mode]);
-
-  // Add data transformation before sending to API
-  const transformDataForAPI = (data) => {
-    const transformed = { ...data };
-
-    const normalizeDecimalString = (val) => {
-      if (val === '' || val === null || val === undefined) return null;
-      const s = String(val).trim().replace(/,/g, '');
-      const normalized = s.replace(/\s+/g, '').replace(',', '.');
-      if (/^-?\d+(\.\d+)?$/.test(normalized)) {
-        return normalized;
-      }
-      return null;
-    };
-
-    for (let i = 1; i <= 5; i++) {
-      const suffix = i === 1 ? "" : String(i);
-      const qtyField = `BalanceQty${suffix}`;
-      transformed[qtyField] = normalizeDecimalString(transformed[qtyField]);
-    }
-
-    transformed.EWayBill = Boolean(transformed.EWayBill);
-    return transformed;
-  };
 
   // helper: convert "HH:mm:ss" or Date() -> "PT#H#M#S"
   const hhmmssToSapDuration = (val) => {
@@ -379,6 +349,46 @@ export default function Outward() {
               </select>
             </div>
 
+            <div className="form-group lookup-field" style={{ position: 'relative', width: '100%' }}>
+              <label className="form-label required">Registration Number</label>
+              <input
+                className="form-input"
+                name="RegistrationNumber"
+                value={header.RegistrationNumber}
+                onChange={handleChange}
+                placeholder="Registration Number"
+                required
+                autoComplete="off"
+                style={{ width: '100%' }}
+              />
+              {lookupLoading && <small className="lookup-hint">Searching...</small>}
+              {showSuggestions && lookupSuggestions.length > 0 && (
+                <div className="dropdown-suggestions" style={{ width: '100%' }}>
+                  <ul className="suggestion-list" style={{ width: '100%' }}>
+                    {lookupSuggestions.map((reg, idx) => (
+                      <li
+                        key={reg.RegistrationNumber + '-' + idx}
+                        className="suggestion-item"
+                        onMouseDown={(e) => {
+                          e.preventDefault();
+                          setSelectedRegNumber(reg.RegistrationNumber);
+                          applyInitialRegData(reg);
+                          setHeader(prev => ({ ...prev, RegistrationNumber: reg.RegistrationNumber }));
+                          setShowSuggestions(false); // hide after selection
+                        }}
+                      >
+                        <span style={{ display: 'inline-block', minWidth: 120 }}><strong>{reg.RegistrationNumber}</strong></span>
+                        <span style={{ color: '#888', marginLeft: 8 }}>{reg.VehicleNumber}</span>
+                        <span style={{ color: '#aaa', marginLeft: 8 }}>{reg.SalesDocument2}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </div>
+
+
+
             <div className="form-group lookup-field">
               <label className="form-label required">Vehicle Number</label>
               <input
@@ -386,25 +396,11 @@ export default function Outward() {
                 name="VehicleNumber"
                 value={header.VehicleNumber}
                 onChange={handleChange}
-                placeholder="Start typing to search..."
+                placeholder ="Enter vehicle number"
                 required
               />
-              {lookupLoading && <small className="lookup-hint">Searching...</small>}
+           {/* {lookupLoading && <small className="lookup-hint">Searching...</small>}  */}
             </div>
-
-            <div className="form-group lookup-field">
-              <label className="form-label required">Registration Number</label>
-              <input
-                className="form-input"
-                name="RegistrationNumber"
-                value={header.RegistrationNumber}
-                onChange={handleChange}
-                placeholder="Start typing to search..."
-                required
-              />
-              {lookupLoading && <small className="lookup-hint">Searching...</small>}
-            </div>
-
             <div className="form-group">
               <label className="form-label">Transporter Name</label>
               <input
@@ -496,39 +492,7 @@ export default function Outward() {
         <section className="form-section">
           <h3 className="section-title">Sales Document Details</h3>
           
-          {showSuggestions && lookupSuggestions.length > 0 && (
-            <div className="lookup-suggestions">
-              <div className="suggestions-header">
-                <strong>Found {lookupSuggestions.length} registered entries:</strong>
-                <button
-                  type="button"
-                  className="close-suggestions"
-                  onClick={() => setShowSuggestions(false)}
-                >
-                  ✕
-                </button>
-              </div>
-              <div className="suggestions-list">
-                {lookupSuggestions.map((reg, idx) => (
-                  <div
-                    key={reg.SAP_UUID || idx}
-                    className="suggestion-item"
-                    onClick={() => applyInitialRegData(reg)}
-                  >
-                    <div className="suggestion-main">
-                      <strong>SD: {reg.SalesDocument2}</strong>
-                      <span className="suggestion-vehicle">{reg.VehicleNumber}</span>
-                    </div>
-                    <div className="suggestion-details">
-                      <span>Transporter: {reg.Transporter || '-'}</span>
-                      <span>Expected Qty: {reg.ExpectedQty || '-'}</span>
-                      <span>Registration Number : {reg.RegistrationNumber || '-'} </span>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
+          {/* RegistrationNumber dropdown filter only; sales document suggestions removed */}
 
           <div className="sd-entry-card">
             <div className="grid-2-cols">
@@ -542,7 +506,7 @@ export default function Outward() {
                   placeholder="Start typing to search..."
                   required
                 />
-                {lookupLoading && <small className="lookup-hint">Searching...</small>}
+                {/* {lookupLoading && <small className="lookup-hint">Searching...</small>} */}
               </div>
 
               <div className="form-group">
