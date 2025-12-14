@@ -48,11 +48,15 @@ const createInitialState = () => {
     MaterialDescription5: '',
     
     TruckNumber: '',
+    LRGCNumber: "",
+    PermitNumber: "",
+    SubTransporterName:"",
     TruckCapacity: '',
     TareWeight: '',
     GrossWeight: '',
     NetWeght: '',
     DifferenceBT: '',
+    Remarks: '',
     
     VendorInvoiceNumber: '',
     VendorInvoiceNumber2: '',
@@ -318,6 +322,10 @@ export default function MaterialInward() {
           GateEntryDate: parsedDate || prev.GateEntryDate,
           TruckNumber: gateEntry.VehicleNumber || gateEntry.TruckNumber || gateEntry.VehicleNo || '',
           GateFiscalYear: gateEntry.FiscalYear || prev.GateFiscalYear,
+          LRGCNumber: gateEntry.LRGCNumber || '',
+          PermitNumber: gateEntry.PermitNumber || '',
+          SubTransporterName: gateEntry.SubTransporterName || '',
+          Remarks: gateEntry.Remarks || '',
 
           // PO lines (fill suffix 1..5)
           PurchaseOrderNumber: gateEntry.PurchaseOrderNumber || '',
@@ -455,17 +463,60 @@ export default function MaterialInward() {
             </div>
 
             <div className="form-group">
-              <label className="form-label">Truck Number</label>
+              <label className="form-label">Vehicle Number</label>
               <input
                 type="text"
                 name="TruckNumber"
                 value={form.TruckNumber}
                 onChange={handleChange}
                 className="form-input"
-                required
+                
               />
             </div>
-
+            <div className="form-group">
+              <label className="form-label">Permit Number</label>
+              <input
+                type="text"
+                name="PermitNumber"
+                value={form.PermitNumber}
+                onChange={handleChange}
+                className="form-input"
+                
+              />
+            </div>
+            <div className="form-group">
+              <label className="form-label">LRGC Number</label>
+              <input
+                type="text"
+                name="LRGCNumber"
+                value={form.LRGCNumber}
+                onChange={handleChange}
+                className="form-input"
+                
+              />
+            </div>
+            <div className="form-group">
+              <label className="form-label">Sub Transporter Name</label>
+              <input
+                type="text"
+                name="SubTransporterName"
+                value={form.SubTransporterName}
+                onChange={handleChange}
+                className="form-input"
+                
+              />
+            </div>
+            <div className="form-group">
+              <label className="form-label">Remarks</label>
+              <input
+                type="text"
+                name="Remarks"
+                value={form.Remarks}
+                onChange={handleChange}
+                className="form-input"
+              
+              />
+            </div>
             <div className="form-group">
               <label className="form-label">Truck Capacity</label>
               <input

@@ -834,7 +834,7 @@ export default function CreateHeader() {
           📷 Scan QR with Camera
         </button>
 
-        <button 
+        {/* <button 
           type="button"
           onClick={() => { setShowQRScanner(true); setQrMode('upload'); setTimeout(() => fileInputRef.current?.click(), 100); }}
           style={{
@@ -852,8 +852,8 @@ export default function CreateHeader() {
             boxShadow: '0 6px 20px rgba(245, 87, 108, 0.4)',
           }}
         >
-          📤 Upload QR Image
-        </button>
+   📤 Upload QR Image 
+        </button> */}
       </div>
 
       {/* QR Scanner Modal */}
@@ -1055,52 +1055,47 @@ export default function CreateHeader() {
 
         <section className="form-section">
           <h3 className="section-title">Purchase Order Details</h3>
-          {Array.from({ length: 5 }).map((_, idx) => {
-            const suffix = idx === 0 ? "" : String(idx + 1);
-            return (
-              <div key={idx} className="po-entry-card">
-                <h4 className="po-entry-title">PO Entry {idx + 1}</h4>
-                <div className="grid-4-cols">
-                  <div className="form-group">
-                    <label className="form-label">PO Number</label>
-                    <input className="form-input" name={`PurchaseOrderNumber${suffix}`} value={header[`PurchaseOrderNumber${suffix}`]} onChange={handleChange} />
-                  </div>
-                  <div className="form-group">
-                    <label className="form-label">Material</label>
-                    <input className="form-input" name={`Material${suffix}`} value={header[`Material${suffix}`]} onChange={handleChange} />
-                  </div>
-                  <div className="form-group">
-                    <label className="form-label">Material Description</label>
-                    <input className="form-input" name={`MaterialDescription${suffix}`} value={header[`MaterialDescription${suffix}`]} onChange={handleChange} />
-                  </div>
-                  <div className="form-group">
-                    <label className="form-label">Vendor</label>
-                    <input className="form-input" name={`Vendor${suffix}`} value={header[`Vendor${suffix}`]} onChange={handleChange} />
-                  </div>
-                  <div className="form-group">
-                    <label className="form-label">Vendor Name</label>
-                    <input className="form-input" name={`VendorName${suffix}`} value={header[`VendorName${suffix}`]} onChange={handleChange} />
-                  </div>
-                  <div className="form-group">
-                    <label className="form-label">Vendor Invoice No</label>
-                    <input className="form-input" name={`VendorInvoiceNumber${suffix}`} value={header[`VendorInvoiceNumber${suffix}`]} onChange={handleChange} />
-                  </div>
-                  <div className="form-group">
-                    <label className="form-label">Vendor Invoice Date</label>
-                    <input className="form-input" type="date" name={`VendorInvoiceDate${suffix}`} value={header[`VendorInvoiceDate${suffix}`]} onChange={handleChange} />
-                  </div>
-                  <div className="form-group">
-                    <label className="form-label">Vendor Invoice Weight</label>
-                    <input className="form-input" name={`VendorInvoiceWeight${suffix}`} type="text" inputMode="decimal" value={header[`VendorInvoiceWeight${suffix}`]} onChange={handleChange} placeholder="0.00" />
-                  </div>
-                  <div className="form-group">
-                    <label className="form-label">Balance Quantity</label>
-                    <input className="form-input" name={`BalanceQty${suffix}`} type="text" inputMode="decimal" value={header[`BalanceQty${suffix}`]} onChange={handleChange} placeholder="0.000" />
-                  </div>
-                </div>
+          <div className="po-entry-card">
+            <h4 className="po-entry-title">PO Entry</h4>
+            <div className="grid-4-cols">
+              <div className="form-group">
+                <label className="form-label">PO Number</label>
+                <input className="form-input" name="PurchaseOrderNumber" value={header.PurchaseOrderNumber} onChange={handleChange} />
               </div>
-            );
-          })}
+              <div className="form-group">
+                <label className="form-label">Material</label>
+                <input className="form-input" name="Material" value={header.Material} onChange={handleChange} />
+              </div>
+              <div className="form-group">
+                <label className="form-label">Material Description</label>
+                <input className="form-input" name="MaterialDescription" value={header.MaterialDescription} onChange={handleChange} />
+              </div>
+              <div className="form-group">
+                <label className="form-label">Vendor</label>
+                <input className="form-input" name="Vendor" value={header.Vendor} onChange={handleChange} />
+              </div>
+              <div className="form-group">
+                <label className="form-label">Vendor Name</label>
+                <input className="form-input" name="VendorName" value={header.VendorName} onChange={handleChange} />
+              </div>
+              <div className="form-group">
+                <label className="form-label">Vendor Invoice No</label>
+                <input className="form-input" name="VendorInvoiceNumber" value={header.VendorInvoiceNumber} onChange={handleChange} />
+              </div>
+              <div className="form-group">
+                <label className="form-label">Vendor Invoice Date</label>
+                <input className="form-input" type="date" name="VendorInvoiceDate" value={header.VendorInvoiceDate} onChange={handleChange} />
+              </div>
+              <div className="form-group">
+                <label className="form-label">Vendor Invoice Weight</label>
+                <input className="form-input" name="VendorInvoiceWeight" type="text" inputMode="decimal" value={header.VendorInvoiceWeight} onChange={handleChange} placeholder="0.00" />
+              </div>
+              <div className="form-group">
+                <label className="form-label">Balance Quantity</label>
+                <input className="form-input" name="BalanceQty" type="text" inputMode="decimal" value={header.BalanceQty} onChange={handleChange} placeholder="0.000" />
+              </div>
+            </div>
+          </div>
         </section>
 
         <div className="form-actions">

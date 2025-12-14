@@ -32,11 +32,15 @@ export default function Outward() {
     GateEntryNumber: "",
     GateEntryDate: currentDate,
     Indicators: "O",
+    VehicleStatus: "IN",
     VehicleNumber: "",
+    TransporterCode:"",
     TransporterName: "",
     DriverName: "",
     DriverPhoneNumber: "",
     PermitNumber: "",
+    DLNumber:"",
+    LRGCNumber:"",
     EWayBill: false,
     Division: "",
     Remarks: "",
@@ -401,6 +405,18 @@ export default function Outward() {
               />
            {/* {lookupLoading && <small className="lookup-hint">Searching...</small>}  */}
             </div>
+
+
+            <div className="form-group">
+              <label className="form-label">Transporter Code</label>
+              <input
+                className="form-input"
+                name="TransporterCode"
+                value={header.TransporterCode}
+                onChange={handleChange}
+              />
+            </div>
+            
             <div className="form-group">
               <label className="form-label">Transporter Name</label>
               <input
@@ -421,15 +437,35 @@ export default function Outward() {
               />
             </div>
 
-            <div className="form-group">
-              <label className="form-label">Driver Phone</label>
-              <input
-                className="form-input"
-                name="DriverPhoneNumber"
-                value={header.DriverPhoneNumber}
-                onChange={handleChange}
-              />
-            </div>
+                  <div className="form-group">
+                    <label className="form-label">Driver Phone</label>
+                    <input
+                      className="form-input"
+                      name="DriverPhoneNumber"
+                      value={header.DriverPhoneNumber}
+                      onChange={handleChange}
+                    />
+                  </div>
+
+                  <div className="form-group">
+                    <label className="form-label">DL Number</label>
+                    <input
+                      className="form-input"
+                      name="DLNumber"
+                      value={header.DLNumber}
+                      onChange={handleChange}
+                    />
+                  </div>
+
+                  <div className="form-group">
+                    <label className="form-label">LRGC Number</label>
+                    <input
+                      className="form-input"
+                      name="LRGCNumber"
+                      value={header.LRGCNumber}
+                      onChange={handleChange}
+                    />
+                  </div>
 
             <div className="form-group">
               <label className="form-label">Permit Number</label>

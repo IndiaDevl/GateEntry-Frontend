@@ -1,10 +1,13 @@
 
 import React, { useState, useEffect, useRef } from "react";
-import { createHeader, fetchNextGateNumber, fetchPurchaseOrderByNumber, fetchPurchaseOrderSuggestions } from "../../api";
+import { createHeader, fetchNextGateNumber, fetchPurchaseOrderByNumber, fetchPurchaseOrderSuggestions, updateHeaderByUUID, fetchGateEntryByNumber } from "../../api";
 import { useLocation } from "react-router-dom";
 import "./CreateHeader.css";
 
 export default function CreateHeader() {
+    // Track if we are editing an existing entry
+    const [isUpdateMode, setIsUpdateMode] = useState(false);
+    const [loadedUUID, setLoadedUUID] = useState(null);
   const currentDate = new Date().toISOString().split('T')[0];
   const currentYear = new Date().getFullYear().toString();
 
@@ -14,11 +17,13 @@ export default function CreateHeader() {
       GateEntryNumber: "",
       GateEntryDate: currentDate,
       Indicators: "I",
+      VehicleStatus: "IN",
       VehicleNumber: "",
       TransporterCode: "",
       TransporterName: "",
       DriverName: "",
       DriverPhoneNumber: "",
+      DrivingLicenseNumber: "",
       LRGCNumber: "",
       PermitNumber: "",
       EWayBill: false,
@@ -57,13 +62,15 @@ export default function CreateHeader() {
   const [poLoading, setPoLoading] = useState({});
   const [lastCreated, setLastCreated] = useState(null);
   
-  // New states for two-step PO selection
-  const [poSelectionModal, setPoSelectionModal] = useState({
+
+  // PO dropdown state
+  const [poDropdown, setPoDropdown] = useState({
     show: false,
     poList: [],
     suffix: '',
     searchQuery: '',
     loading: false
+    // selectedPO: null
   });
 
   const [poItemsModal, setPoItemsModal] = useState({
@@ -129,15 +136,15 @@ export default function CreateHeader() {
     // Debounce the search
     searchTimeoutRef.current = setTimeout(async () => {
       try {
-        // If value is short (1-3 chars), show PO selection modal
+        // Show PO dropdown for short input
         if (value.length >= 1 && value.length <= 10) {
-          await fetchAndShowPOList(value, suffix);
+          await fetchAndShowPODropdown(value, suffix);
           return;
         }
-
-        // If full PO number (>=4 chars), fetch directly
+        // If full PO number (>=10 chars), fetch directly
         if (value.length >= 10) {
           await fetchAndShowPOItems(value, suffix, true);
+          setPoDropdown(prev => ({ ...prev, show: false, poList: [] }));
         }
       } catch (err) {
         console.error('Error in PO handling:', err);
@@ -149,32 +156,27 @@ export default function CreateHeader() {
   };
 
   // ============================================
-  // NEW: Function to fetch and show PO list
+  // NEW: Function to fetch and show PO dropdown
   // ============================================
-  const fetchAndShowPOList = async (query, suffix) => {
-    setPoSelectionModal(prev => ({ ...prev, loading: true }));
-    
+  const fetchAndShowPODropdown = async (query, suffix) => {
+    setPoDropdown(prev => ({ ...prev, loading: true, show: true, suffix, searchQuery: query }));
     try {
       const response = await fetchPurchaseOrderSuggestions(query);
-      console.log('PO Suggestions received:', response.data);
-      
       if (response.data.items && response.data.items.length > 0) {
-        setPoSelectionModal({
+        setPoDropdown({
           show: true,
           poList: response.data.items,
-          suffix: suffix,
+          suffix,
           searchQuery: query,
           loading: false
         });
       } else {
-        alert(`No POs found starting with "${query}"`);
-        setPoSelectionModal(prev => ({ ...prev, loading: false }));
+        setPoDropdown(prev => ({ ...prev, show: false, poList: [], loading: false }));
         clearPOFields(suffix);
       }
     } catch (err) {
-      console.error('Error fetching PO suggestions:', err);
-      setPoSelectionModal(prev => ({ ...prev, loading: false }));
-      alert('Failed to fetch PO list. Please try again.');
+      setPoDropdown(prev => ({ ...prev, show: false, poList: [], loading: false }));
+      clearPOFields(suffix);
     }
   };
 
@@ -238,27 +240,15 @@ export default function CreateHeader() {
   };
 
   // ============================================
-  // NEW: Handle PO selection from PO list modal
+  // NEW: Handle PO selection from dropdown
   // ============================================
-  const handleSelectPOFromList = (selectedPO) => {
-    const { suffix } = poSelectionModal;
-    
-    // Update the PO number in the form
+  const handleSelectPOFromDropdown = (selectedPO) => {
+    const { suffix } = poDropdown;
     setHeader(prev => ({
       ...prev,
       [`PurchaseOrderNumber${suffix}`]: selectedPO.PurchaseOrder
     }));
-    
-    // Close PO selection modal
-    setPoSelectionModal({
-      show: false,
-      poList: [],
-      suffix: '',
-      searchQuery: '',
-      loading: false
-    });
-    
-    // Fetch line items for the selected PO
+    setPoDropdown({ show: false, poList: [], suffix: '', searchQuery: '', loading: false });
     fetchAndShowPOItems(selectedPO.PurchaseOrder, suffix, false);
   };
 
@@ -412,6 +402,28 @@ export default function CreateHeader() {
 
     try {
       let gateEntryNumber = header.GateEntryNumber;
+      let uuid = loadedUUID;
+      // If update mode, use PATCH
+      if (isUpdateMode && uuid) {
+        // Prepare payload (do not send GateEntryNumber or UUID fields)
+        const rawPayload = {
+          ...header,
+          GateEntryDate: `${header.GateEntryDate}T00:00:00`,
+          InwardTime: hhmmssToSapDuration(header.InwardTime),
+          OutwardTime: hhmmssToSapDuration(header.OutwardTime),
+          SAP_CreatedDateTime: nowIso(),
+          FiscalYear: header.FiscalYear || currentYear
+        };
+        delete rawPayload.GateEntryNumber;
+        const payload = transformDataForAPI(rawPayload);
+        const response = await updateHeaderByUUID(uuid, payload);
+        setResult('Gate entry updated successfully');
+        setTimeout(() => setResult(null), 20000);
+        setLoading(false);
+        return;
+      }
+
+      // Else, create new
       if (!gateEntryNumber) {
         const year = header.GateEntryDate ? header.GateEntryDate.slice(0, 4) : currentYear;
         const resp = await fetchNextGateNumber(year, series);
@@ -486,9 +498,45 @@ export default function CreateHeader() {
   const resetForm = (opts = { keepMessages: false }) => {
     setHeader(createInitialHeaderState());
     setError(null);
+    setIsUpdateMode(false);
+    setLoadedUUID(null);
     if (!opts.keepMessages) {
       setResult(null);
       setLastCreated(null);
+    }
+  };
+
+  // Load existing entry by GateEntryNumber
+  const handleLoadForUpdate = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      if (!header.GateEntryNumber) {
+        setError('Enter Gate Entry Number to load for update');
+        setLoading(false);
+        return;
+      }
+      const resp = await fetchGateEntryByNumber(header.GateEntryNumber);
+      let entry = null;
+      if (resp.data?.d?.results?.length) {
+        entry = resp.data.d.results[0];
+      } else if (resp.data?.value?.length) {
+        entry = resp.data.value[0];
+      }
+      if (!entry) {
+        setError('Gate entry not found');
+        setLoading(false);
+        return;
+      }
+      // Map SAP fields to form fields as needed
+      setHeader(prev => ({ ...prev, ...entry }));
+      setIsUpdateMode(true);
+      setLoadedUUID(entry.SAP_UUID || entry.uuid || entry.Id || entry.id);
+      setResult('Loaded for update. Edit and click Update.');
+    } catch (err) {
+      setError('Failed to load entry for update');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -701,7 +749,7 @@ export default function CreateHeader() {
               <div key={idx} className="po-entry-card">
                 <h4 className="po-entry-title">Purchase Order Entry {idx + 1}</h4>
                 <div className="grid-4-cols">
-                  <div className="form-group">
+                  <div className="form-group" style={{ position: 'relative' }}>
                     <label className="form-label">Purchase Order Number</label>
                     <div className="po-input-wrapper">
                       <input
@@ -717,14 +765,44 @@ export default function CreateHeader() {
                           minWidth: '120px',
                           maxWidth: '250px'
                         }}
+                        autoComplete="off"
                       />
                       {poLoading[suffix] && (
                         <div className="po-loading-spinner" />
                       )}
+                      {/* PO Dropdown */}
+                      {poDropdown.show && poDropdown.suffix === suffix && poDropdown.poList.length > 0 && (
+                        <div className="po-dropdown" style={{
+                          position: 'absolute',
+                          top: '100%',
+                          left: 0,
+                          zIndex: 10,
+                          background: '#fff',
+                          border: '1px solid #e5e7eb',
+                          borderRadius: 6,
+                          boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
+                          minWidth: '240px',
+                          maxHeight: '220px',
+                          overflowY: 'auto',
+                          marginTop: 2
+                        }}>
+                          {poDropdown.poList.map((po, i) => (
+                            <div key={i} className="po-dropdown-item" style={{
+                              padding: '8px 12px',
+                              cursor: 'pointer',
+                              borderBottom: i < poDropdown.poList.length - 1 ? '1px solid #f3f4f6' : 'none',
+                              background: '#fff'
+                            }}
+                              onClick={() => handleSelectPOFromDropdown(po)}
+                            >
+                              <div style={{ fontWeight: 600 }}>{po.PurchaseOrder}</div>
+                              <div style={{ fontSize: '0.95em', color: '#444' }}>{po.Supplier} - {po.SupplierName}</div>
+                              <div style={{ fontSize: '0.9em', color: '#666' }}>{po.PurchaseOrderDate ? new Date(po.PurchaseOrderDate).toLocaleDateString() : 'N/A'}</div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
                     </div>
-                    {/* <small className="po-hint">
-
-                    </small> */}
                     {header[`__POCompletedMsg${suffix}`] && (
                       <div className="po-completed-badge" style={{ color: '#b91c1c', fontWeight: 500, marginTop: 4 }}>
                         {header[`__POCompletedMsg${suffix}`]}
@@ -845,10 +923,15 @@ export default function CreateHeader() {
             disabled={loading}
             className={`btn btn-primary ${loading ? 'disabled' : ''}`}
           >
-            {loading ? "Creating..." : 
-             mode === "inward" ? "Create Inward Entry" : 
-             mode === "outward" ? "Create Outward Entry" : 
-             "Create Gate Entry"}
+            {loading
+              ? (isUpdateMode ? "Updating..." : "Creating...")
+              : isUpdateMode
+                ? "Update Gate Entry"
+                : (mode === "inward"
+                  ? "Create Inward Entry"
+                  : mode === "outward"
+                    ? "Create Outward Entry"
+                    : "Create Gate Entry")}
           </button>
 
           <button
@@ -858,62 +941,20 @@ export default function CreateHeader() {
           >
             Reset Form
           </button>
+
+          <button
+            type="button"
+            onClick={handleLoadForUpdate}
+            className="btn btn-info"
+            style={{ marginLeft: 8 }}
+            disabled={loading || !header.GateEntryNumber}
+          >
+            Load for Update
+          </button>
         </div>
       </form>
 
-      {/* ============================================
-          MODAL 1: PO Selection (First Step)
-      ============================================ */}
-      {poSelectionModal.show && (
-        <div className="modal-overlay" onClick={closePOListModal}>
-          <div className="modal-content po-modal-small" onClick={(e) => e.stopPropagation()}>
-            <div className="modal-header" style={{ padding: '10px 16px' }}>
-              <h3 style={{ fontSize: '1.1em', margin: 0 }}>Select Purchase Order</h3>
-              <p className="modal-subtitle" style={{ fontSize: '0.95em', margin: '4px 0 0 0' }}>
-                Found {poSelectionModal.poList.length} PO(s) starting with "{poSelectionModal.searchQuery}"
-              </p>
-              <button className="modal-close" style={{ fontSize: '1.2em' }} onClick={closePOListModal}>&times;</button>
-            </div>
-            <div className="modal-body" style={{ padding: '10px 16px' }}>
-              {poSelectionModal.loading ? (
-                <div className="modal-loading">
-                  <div className="spinner"></div>
-                  <p>Loading POs...</p>
-                </div>
-              ) : (
-                <div className="po-list-container" style={{ maxHeight: 260, overflowY: 'auto', minWidth: 260, maxWidth: 340 }}>
-                  {poSelectionModal.poList.map((po, index) => (
-                    <div key={index} className="po-card" style={{ padding: 8, margin: '6px 0', border: '1px solid #e5e7eb', borderRadius: 6, background: '#f9fafb', cursor: 'pointer' }} onClick={() => handleSelectPOFromList(po)}>
-                      <div className="po-card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <span style={{ fontWeight: 600 }}>{po.PurchaseOrder}</span>
-                        <span className="po-date" style={{ fontSize: '0.9em', color: '#666' }}>
-                          {po.PurchaseOrderDate ? new Date(po.PurchaseOrderDate).toLocaleDateString() : 'N/A'}
-                        </span>
-                      </div>
-                      <div className="po-card-body" style={{ fontSize: '0.97em', color: '#444' }}>
-                        <span><strong>Supplier:</strong> {po.Supplier} - {po.SupplierName}</span>
-                      </div>
-                      <div className="po-card-footer" style={{ textAlign: 'right' }}>
-                        <button
-                          type="button"
-                          className="btn-select-po"
-                          style={{ fontSize: '0.95em', padding: '2px 10px', borderRadius: 4, background: '#2563eb', color: '#fff', border: 'none', cursor: 'pointer' }}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleSelectPOFromList(po);
-                          }}
-                        >
-                          Select PO
-                        </button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
+      {/* PO dropdown is now inline under the input, not a modal */}
 
       {/* ============================================
           MODAL 2: Line Items Selection (Second Step)

@@ -44,6 +44,13 @@ const createInitialState = () => {
     MaterialDescription5: '',
     
     TruckNumber: '',
+    TransporterCode: '',
+    DriverName: '',
+    DriverPhoneNumber: '',
+    LRGCNumber: '',
+    PermitNumber: '',
+    SubTransporterName: '',
+    Remarks: '',
     TruckCapacity: '',
     TareWeight: '', // User will enter this
     GrossWeight: '', // This will come from the original record
@@ -252,6 +259,12 @@ export default function MaterialInwardOut() {
           GateEntryNumber: value.trim(),
           GateEntryDate: parsedDate || prev.GateEntryDate,
           TruckNumber: inwardRecord.TruckNumber || '',
+          SubTransporterName: inwardRecord.SubTransporterName || '',
+          Remarks: inwardRecord.Remarks || '',
+          Driver: inwardRecord.DriverName || '',
+          DriverPhoneNumber: inwardRecord.DriverPhoneNumber || '',
+          LRGCNumber: inwardRecord.LRGCNumber || '',
+          PermitNumber: inwardRecord.PermitNumber || '',
           GateFiscalYear: inwardRecord.FiscalYear || inwardRecord.GateFiscalYear || prev.GateFiscalYear,
           FiscalYear: inwardRecord.FiscalYear || prev.FiscalYear,
 
@@ -392,6 +405,78 @@ export default function MaterialInwardOut() {
                 type="text"
                 name="TruckNumber"
                 value={form.TruckNumber}
+                className="form-input"
+                readOnly
+                style={{ backgroundColor: '#f0f0f0' }}
+              />
+            </div>
+
+            <div className="form-group">
+              <label className="form-label">Driver</label>
+              <input
+                type="text"
+                name="Driver"
+                value={form.Driver}
+                className="form-input"
+                readOnly
+                style={{ backgroundColor: '#f0f0f0' }}
+              />
+            </div>
+
+            <div className="form-group">
+              <label className="form-label">Driver Phone Number</label>
+              <input
+                type="text"
+                name="DriverPhoneNumber"
+                value={form.DriverPhoneNumber}
+                className="form-input"
+                readOnly
+                style={{ backgroundColor: '#f0f0f0' }}
+              />
+            </div>
+
+            <div className="form-group">
+              <label className="form-label">LRGC Number</label>
+              <input
+                type="text"
+                name="LRGCNumber"
+                value={form.LRGCNumber}
+                className="form-input"
+                readOnly
+                style={{ backgroundColor: '#f0f0f0' }}
+              />
+            </div>
+
+            <div className="form-group">
+              <label className="form-label">Permit Number</label>
+              <input  
+                type="text"
+                name="PermitNumber"
+                value={form.PermitNumber}
+                className="form-input"
+                readOnly
+                style={{ backgroundColor: '#f0f0f0' }}  
+              />
+            </div>
+
+            <div className="form-group">
+              <label className="form-label">Sub Transporter Name</label>
+              <input
+                type="text"
+                name="SubTransporterName"
+                value={form.SubTransporterName}
+                className="form-input"
+                readOnly
+                style={{ backgroundColor: '#f0f0f0' }}
+              />
+            </div>
+          
+          <div className="form-group">  
+              <label className="form-label">Remarks</label>
+              <input
+                type="text"
+                name="Remarks"
+                value={form.Remarks}
                 className="form-input"
                 readOnly
                 style={{ backgroundColor: '#f0f0f0' }}

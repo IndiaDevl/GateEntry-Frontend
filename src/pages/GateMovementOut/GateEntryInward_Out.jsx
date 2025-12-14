@@ -62,6 +62,7 @@ export default function GateEntryOutwardCompletion() {
     const base = {
       GateEntryNumber: r.GateEntryNumber || "",
       GateEntryDate: (r.GateEntryDate || "").slice(0, 10) || currentDate,
+      VehicleStatus: "OUT",
       VehicleNumber: r.VehicleNumber || "",
       TransporterName: r.TransporterName || "",
       DriverName: r.DriverName || "",
@@ -110,6 +111,7 @@ export default function GateEntryOutwardCompletion() {
   const createInitialHeaderState = () => {
     const initialState = {
       GateEntryNumber: "",
+      VehicleStatus: "OUT",
       GateEntryDate: currentDate,
       VehicleNumber: "",
       TransporterName: "",

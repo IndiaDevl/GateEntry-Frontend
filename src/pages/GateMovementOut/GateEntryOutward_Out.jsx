@@ -119,6 +119,7 @@ export default function GateEntryOutwardSD() {
   const hydrateFromSap = (r = {}) => {
     const base = {
       GateEntryNumber: r.GateEntryNumber || "",
+      VehicleStatus: "OUT",
       GateEntryDate: (r.GateEntryDate || "").slice(0, 10) || todayISO,
       VehicleNumber: r.VehicleNumber || r.TruckNumber || r.LorryNumber || "",
       TransporterName: r.TransporterName || r.Transporter || r.CarrierName || "",
@@ -144,6 +145,7 @@ export default function GateEntryOutwardSD() {
 
   const initialState = {
     GateEntryNumber: "",
+    VehicleStatus: "OUT",
     GateEntryDate: todayISO,
     VehicleNumber: "",
     TransporterName: "",

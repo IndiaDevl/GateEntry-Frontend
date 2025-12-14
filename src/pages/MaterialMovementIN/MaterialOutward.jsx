@@ -1,14 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { 
-  createMaterialOutward,  // Change this import
-  createOutboundDelivery,
-  fetchNextWeightDocNumber,
-  fetchGateEntryByNumber,
-  fetchSalesOrderByNumber,
-  updateMaterialInward,
-  updateobdMaterialOutward,
-  fetchSalesOrderSuggestions
-} from '../../api';
+  fetchNextWeightDocNumber,fetchGateEntryByNumber,fetchSalesOrderByNumber,updateMaterialInward,fetchSalesOrderSuggestions,updateobdMaterialOutward
+,createOBDandMaterialOutwardCreate} from '../../api';
 import './MaterialINHome';
 
 // Helper: ISO timestamp
@@ -41,6 +34,10 @@ const createInitialState = () => {
 
     TruckNumber: '',
     TruckCapacity: '',
+    TransporterCode: '',
+    LRGCNumber: '',
+    PermitNumber: '',
+    Remarks: '',
     TareWeight: '',
     GateEntryDate: todayDateOnly,
     GateOutDate: todayDateOnly,
@@ -126,94 +123,84 @@ export default function MaterialOutward() {
         setForm(prev => ({ ...prev, WeightDocNumber: String(nextNumber || '') }));
         payload.WeightDocNumber = String(nextNumber || '');
       }
-      // Store the numbers before submission
-      const submittedWeightDocNumber = payload.WeightDocNumber;
-      const submittedGateEntryNumber = payload.GateEntryNumber;
       // normalize dates
       if (payload.GateEntryDate?.length === 10) payload.GateEntryDate = `${payload.GateEntryDate}T00:00:00`;
       if (payload.GateOutDate?.length === 10) payload.GateOutDate = `${payload.GateOutDate}T00:00:00`;
       payload.SAP_CreatedDateTime = nowIso();
       // Remove UI-only fields
       delete payload._docType;
-      // Use the outward endpoint
-      const resp = await createMaterialOutward(payload);
-      // Get the returned numbers from SAP response (if available)
-      const returnedWeightDocNumber = resp?.data?.d?.WeightDocNumber 
-        || resp?.data?.WeightDocNumber 
-        || submittedWeightDocNumber;
-      const returnedGateEntryNumber = resp?.data?.d?.GateEntryNumber 
-        || resp?.data?.GateEntryNumber 
-        || submittedGateEntryNumber;
-      let successMsg = `Material Outward created successfully! Weight Document Number: ${returnedWeightDocNumber} | Gate Entry Number: ${returnedGateEntryNumber}`;
-      // 1. Fetch SO details
-      let outboundError = '';
-      try {
-        const soNumber = form.SalesDocument && String(form.SalesDocument).trim();
-        console.log('soNumber', soNumber);
-        if (!soNumber) {
-          outboundError = 'Sales Document number is missing.';
-        } else {
-          const soResp = await fetchSalesOrderByNumber(soNumber);
-          const soData = soResp.data || soResp;
-          console.log('soData', soData); // <-- Add this line
 
-          // Use items if present, otherwise fallback to to_Item.results
-          const items = Array.isArray(soData.items) && soData.items.length > 0
-            ? soData.items
-            : (soData.to_Item && Array.isArray(soData.to_Item.results) ? soData.to_Item.results : []);
-
-          if (!items || items.length === 0) {
-            outboundError = 'No SO items found for outbound delivery.';
-          } else {
-            const outboundPayload = {
-              ShippingPoint: "1810",
-              to_DeliveryDocumentItem: {
-                results: items.map(item => ({
-                  ReferenceSDDocument: soNumber,
-                  ReferenceSDDocumentItem: item.SalesOrderItem || "10",
-                  ActualDeliveryQuantity: form.BalanceQty || "1",
-                  DeliveryQuantityUnit: "PC"
-                }))
-              }
-            };
-            try {
-              const obdResp = await createOutboundDelivery(outboundPayload);
-              // Try to get Outbound Delivery number from response
-              let outboundNumber = obdResp?.data?.d?.DeliveryDocument || obdResp?.data?.DeliveryDocument || obdResp?.data?.d?.DeliveryNumber || obdResp?.data?.DeliveryNumber || 'Success';
-              successMsg += ` | Outbound Delivery created: ${outboundNumber}`;
-
-              // Update OutboundDelivery in Weightbridge
-              if (outboundNumber && returnedWeightDocNumber) {
-                try {
-                  await updateobdMaterialOutward(returnedWeightDocNumber, { OutboundDelivery: outboundNumber });
-                  successMsg += ` | Outbound Delivery updated in Weightbridge: ${outboundNumber}`;
-                } catch (patchErr) {
-                  successMsg += ` | Outbound Delivery created but failed to update Weightbridge: ${patchErr.message}`;
-                }
-              }
-            } catch (err) {
-              let errorMsg = err?.response?.data?.error?.message?.value 
-                || err?.response?.data?.error 
-                || err?.message 
-                || 'Failed to create outbound delivery';
-              if (typeof errorMsg === 'string' && errorMsg.startsWith('<!DOCTYPE')) {
-                errorMsg = 'Backend error: Outbound Delivery API failed. Check server logs for details.';
-              }
-              outboundError = errorMsg;
+      // Split payload for backend
+      const outboundDeliveryPayload = {
+        ShippingPoint: "1810", // Use your actual shipping point
+        to_DeliveryDocumentItem: {
+          results: [
+            {
+              ReferenceSDDocument: form.SalesDocument,
+              ReferenceSDDocumentItem: "10", // or the correct item number
+              ActualDeliveryQuantity: form.BalanceQty || "1",
+              DeliveryQuantityUnit: "TON"
             }
-          }
+          ]
         }
-      } catch (soErr) {
-        outboundError = `${soErr.message} 'Failed to create outbound delivery.'`;
+      };
+      const weightDocumentPayload = {
+        WeightDocNumber: payload.WeightDocNumber,
+        FiscalYear: payload.FiscalYear,
+        Indicators: payload.Indicators,
+        GateEntryNumber: payload.GateEntryNumber,
+        GateFiscalYear: payload.GateFiscalYear,
+        GateIndicators: payload.GateIndicators,
+        OutboundDelivery: payload.OutboundDelivery,
+        TruckNumber: payload.TruckNumber,
+        TransporterCode: payload.TransporterCode,
+        LRGCNumber: payload.LRGCNumber,
+        PermitNumber: payload.PermitNumber,
+        Remarks: payload.Remarks,
+        TruckCapacity: payload.TruckCapacity,
+        TareWeight: payload.TareWeight,
+        GateEntryDate: payload.GateEntryDate,
+        GateOutDate: payload.GateOutDate,
+        SAP_CreatedDateTime: payload.SAP_CreatedDateTime,
+        // Add more Weight Document fields if needed
+      };
+      const apiPayload = {
+        outboundDelivery: outboundDeliveryPayload,
+        weightDocument: weightDocumentPayload
+      };
+
+      // Call the combined API for Outbound Delivery and Material Outward
+      const resp = await createOBDandMaterialOutwardCreate(apiPayload);
+      // Expect backend to return { success: true, outboundDeliveryNumber, weightDocNumber, gateEntryNumber } or error
+      if (resp?.data?.success) {
+        const outboundDeliveryNumber = resp.data.outboundDeliveryNumber || '';
+        const weightDocNumber = resp.data.weightDocNumber || '';
+        const gateEntryNumber = resp.data.gateEntryNumber || '';
+
+        // Update OutboundDelivery and all SD fields in material document (weight doc)
+        if (weightDocNumber && outboundDeliveryNumber) {
+          await updateobdMaterialOutward(weightDocNumber, {
+            OutboundDelivery: outboundDeliveryNumber,
+            SalesDocument: form.SalesDocument,
+            Customer: form.Customer,
+            CustomerName: form.CustomerName,
+            Material: form.Material,
+            MaterialDescription: form.MaterialDescription,
+            BalanceQty: form.BalanceQty
+          });
+        }
+
+        setResult(`Material Outward and Outbound Delivery created successfully! Weight Document Number: ${weightDocNumber} | Gate Entry Number: ${gateEntryNumber} | Outbound Delivery: ${outboundDeliveryNumber}`);
+      } else {
+        // Show backend error message
+        const msg = resp?.data?.error || 'Failed to create Outbound Delivery and Material Outward.';
+        setError(msg);
       }
-      setResult(outboundError ? `${successMsg} | ${outboundError}` : successMsg);
     } catch (err) {
       console.error('Create Outward error:', err);
-      const errorMsg = err?.response?.data?.error?.message?.value 
-        || err?.response?.data?.error 
-        || err?.message 
-        || 'Failed to create material outward';
-      setError(typeof errorMsg === 'string' ? errorMsg : JSON.stringify(errorMsg));
+      // SAP error extraction
+      const msg = err?.response?.data?.error?.message?.value || err?.response?.data?.error || err.message || 'Unknown error';
+      setError(msg); // Show in your error box
     } finally {
       setLoading(false);
     }
@@ -265,6 +252,10 @@ export default function MaterialOutward() {
               GateEntryNumber: value.trim(), // KEEP user input
               GateEntryDate: parsedDate || prev.GateEntryDate,
               TruckNumber: entry.VehicleNumber || entry.TruckNumber || entry.VehicleNo || '',
+              TransporterCode: entry.TransporterCode || '',
+              LRGCNumber: entry.LRGCNumber || '',
+              PermitNumber: entry.PermitNumber || '',
+              Remarks: entry.Remarks || '',
               GateFiscalYear: entry.FiscalYear || prev.GateFiscalYear,
 
               SalesDocument: entry.SalesDocument || '',
@@ -339,8 +330,27 @@ export default function MaterialOutward() {
             </div>
 
             <div className="form-group">
-              <label className="form-label">Truck Number</label>
-              <input type="text" name="TruckNumber" value={form.TruckNumber} onChange={handleChange} className="form-input" required />
+              <label className="form-label">Vehicle Number</label>
+              <input type="text" name="Vehicle Number" value={form.TruckNumber} onChange={handleChange} className="form-input" />
+            </div>
+
+            <div className="form-group">
+              <label className="form-label">Transporter</label>
+              <input type="text" name="Transporter" value={form.TransporterCode} onChange={handleChange} className="form-input" />
+            </div>
+
+            <div className="form-group">
+              <label className="form-label">LRGC Number</label>
+              <input type="text" name="LRGCNumber" value={form.LRGCNumber} onChange={handleChange} className="form-input" placeholder="LRGC12345"  />
+            </div>
+            <div className="form-group">
+              <label className="form-label">Permit Number</label>
+              <input type="text" name="PermitNumber" value={form.PermitNumber} onChange={handleChange} className="form-input" placeholder="PERMIT67890"/>
+            </div>
+
+            <div className="form-group">
+              <label className="form-label">Remarks</label>
+              <input type="text" name="Remarks" value={form.Remarks} onChange={handleChange} className="form-input" placeholder="Remarks here"/>
             </div>
 
             <div className="form-group">
@@ -409,6 +419,11 @@ export default function MaterialOutward() {
           <strong>Success:</strong> {result}
         </div>
       )}
+      {error && (
+  <div className="error-message">
+    <strong>Error:</strong> {typeof error === 'string' ? error : JSON.stringify(error)}
+  </div>
+)}
     </div>
   );
 }

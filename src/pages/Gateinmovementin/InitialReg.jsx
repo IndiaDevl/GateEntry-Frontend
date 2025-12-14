@@ -4,6 +4,10 @@ import { useLocation } from "react-router-dom";
 import "./InitialReg.css";
 
 export default function InitialRegistration() {
+    // RemainingQty state
+    const [remainingQty, setRemainingQty] = useState(null);
+  // Track available qty for validation
+  const [availableQty, setAvailableQty] = useState(null);
   const location = useLocation();
 
   // Always initialize all fields as string or number (never undefined/null)
@@ -46,23 +50,59 @@ export default function InitialRegistration() {
 
   // SO Suggestion handler
   useEffect(() => {
-    const val = (formData.SalesDocument2 || "").trim();
-    if (val.length < 2) {
-      setSoSuggestions([]);
-      setShowSoSuggestions(false);
-      return;
-    }
-    let ignore = false;
-    fetchSalesOrderSuggestions(val)
-      .then(res => {
-        if (!ignore) {
-          setSoSuggestions(res.data || []);
-          setShowSoSuggestions(true);
-        }
-      })
-      .catch(() => setSoSuggestions([]));
-    return () => { ignore = true; };
-  }, [formData.SalesDocument2]);
+      const val = (formData.SalesDocument2 || "").trim();
+      if (val.length < 2) {
+        setSoSuggestions([]);
+        setShowSoSuggestions(false);
+        setRemainingQty(null);
+        return;
+      }
+      let ignore = false;
+      // Fetch SO suggestions and for each, fetch used qty and calculate remaining
+      fetchSalesOrderSuggestions(val)
+        .then(async res => {
+          if (!ignore) {
+            const suggestions = res.data || [];
+            // For each SO, fetch used qty and calculate remaining
+            const updatedSuggestions = await Promise.all(suggestions.map(async (s) => {
+              const soNumber = s.SalesDocument2 || s.SalesOrder || s.SalesDocument || "";
+              // Fetch registrations for this SO
+              try {
+                const regRes = await fetchInitialRegistrations({ search: soNumber, top: 50 });
+                const regResults = regRes?.data?.d?.results || [];
+                const usedQty = regResults
+                  .filter(r => r.SalesDocument2 === soNumber || r.SalesDocument === soNumber)
+                  .reduce((sum, r) => sum + (Number(r.ExpectedQty) || 0), 0);
+                const balanceQty = Number(s.BalanceQty || (s.items && s.items[0]?.BalanceQty) || 0);
+                const remainingQty = balanceQty - usedQty;
+                return { ...s, UsedQty: usedQty, RemainingQty: remainingQty };
+              } catch {
+                return { ...s, UsedQty: 0, RemainingQty: Number(s.BalanceQty || (s.items && s.items[0]?.BalanceQty) || 0) };
+              }
+            }));
+            setSoSuggestions(updatedSuggestions);
+            setShowSoSuggestions(true);
+          }
+        })
+        .catch(() => setSoSuggestions([]));
+      // For the selected SO, fetch registrations and set remainingQty for display
+      fetchInitialRegistrations({ search: val, top: 50 })
+        .then(res => {
+          const results = res?.data?.d?.results || [];
+          const totalQty = results
+            .filter(r => r.SalesDocument2 === val || r.SalesDocument === val)
+            .reduce((sum, r) => sum + (Number(r.ExpectedQty) || 0), 0);
+          // Get SO master qty
+          let soMasterQty = 0;
+          if (soSuggestions && soSuggestions.length > 0) {
+            const soObj = soSuggestions.find(s => (s.SalesDocument2 || s.SalesOrder || s.SalesDocument) === val);
+            soMasterQty = Number(soObj?.BalanceQty || (soObj?.items && soObj.items[0]?.BalanceQty) || 0);
+          }
+          setRemainingQty(soMasterQty - totalQty);
+        })
+        .catch(() => setRemainingQty(null));
+      return () => { ignore = true; };
+    }, [formData.SalesDocument2]);
 
   // Hide suggestions on outside click
   useEffect(() => {
@@ -88,6 +128,19 @@ export default function InitialRegistration() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    const expectedQtyNum = Number(formData.ExpectedQty);
+    if (isNaN(expectedQtyNum) || expectedQtyNum <= 0) {
+      alert("Expected Quantity must be a positive number");
+      return;
+    }
+    if (availableQty !== null && availableQty <= 0) {
+      alert("Registration not allowed: SO is fully registered (Remaining Qty is zero)");
+      return;
+    }
+    if (formData.ExpectedQty && availableQty !== null && expectedQtyNum >= Number(availableQty)) {
+      alert(`Expected Quantity cannot be more than available (${availableQty})`);
+      return;
+    }
     setSubmitting(true);
     setSuccessMsg("");
     try {
@@ -99,7 +152,9 @@ export default function InitialRegistration() {
       // Get RegistrationNumber from backend response
       const regNumber = res?.data?.RegistrationNumber || "";
       setSuccessMsg(`Initial Registration Successfully!\nSalesOrder Number: ${formData.SalesDocument2} | Vehicle: ${formData.VehicleNumber} | Initial Reg Number: ${regNumber}`);
-      setFormData(initialFormState);
+      setFormData({ ...initialFormState, SalesDocument2: "", ExpectedQty: "" });
+      setRemainingQty(null);
+      setAvailableQty(null); // Reset availableQty after registration
       if (showList) loadList({ search });
     } catch (error) {
       console.error("Initial Registration Error:", error);
@@ -196,7 +251,8 @@ export default function InitialRegistration() {
                   const soNumber = s.SalesDocument2 || s.SalesOrder || s.SalesDocument || "N/A";
                   const material = s.Material || (s.items && s.items[0]?.Material) || "";
                   const materialDesc = s.MaterialDescription || (s.items && s.items[0]?.MaterialDescription) || "";
-                  const balanceQty = s.BalanceQty || (s.items && s.items[0]?.BalanceQty) || "";
+                  // Show RemainingQty as Balance Qty
+                  const balanceQty = s.RemainingQty !== undefined ? s.RemainingQty : (s.BalanceQty || (s.items && s.items[0]?.BalanceQty) || "");
                   return (
                     <li
                       key={soNumber + "_" + i}
@@ -208,7 +264,8 @@ export default function InitialRegistration() {
                           CustomerName: s.CustomerName || "",
                           Material: material,
                           MaterialDescription: materialDesc,
-                          BalanceQty: balanceQty || s.BalanceQty || ""
+                          BalanceQty: balanceQty,
+                          ExpectedQty: balanceQty // Set ExpectedQty to RemainingQty
                         }));
                         setShowSoSuggestions(false);
                       }}
@@ -219,7 +276,7 @@ export default function InitialRegistration() {
                         {s.CustomerName && <span style={{marginLeft:8}}>Name: {s.CustomerName}</span>}
                         {material && <span style={{marginLeft:8}}>Material: {material}</span>}
                         {materialDesc && <span style={{marginLeft:8}}>Desc: {materialDesc}</span>}
-                        {balanceQty && <span style={{marginLeft:8}}>Balance Qty: {balanceQty}</span>}
+                        {balanceQty !== undefined && <span style={{marginLeft:8}}>Balance Qty: {balanceQty}</span>}
                       </div>
                     </li>
                   );
@@ -237,6 +294,16 @@ export default function InitialRegistration() {
               required
               step="0.01"
             />
+            {formData.ExpectedQty && Number(formData.ExpectedQty) <= 0 && (
+              <div style={{ marginTop: 4, color: 'red', fontWeight: 500 }}>
+                Error: Quantity not available in sales document
+              </div>
+            )}
+            {formData.ExpectedQty && availableQty !== null && Number(formData.ExpectedQty) > Number(availableQty) && (
+              <div style={{ marginTop: 4, color: 'red', fontWeight: 500 }}>
+                Error: Expected Qty more than Sales Document Qty
+              </div>
+            )}
           </div>
         </div>
         <div className="form-row-2col">
@@ -272,10 +339,11 @@ export default function InitialRegistration() {
           />
         </div>
         <div className="actions-row">
+          {/* Removed Used Initial Reg Qty display */}
           <button
             type="submit"
             className="submit-button"
-            disabled={submitting}
+            disabled={submitting || (availableQty !== null && availableQty <= 0)}
           >
             {submitting ? "Submitting..." : "Submit"}
           </button>

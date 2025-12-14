@@ -33,6 +33,10 @@ const createInitialState = () => {
     MaterialDescription: '',
     
     TruckNumber: '',
+    TransporterCode: '',
+    LRGCNumber: '',
+    PermitNumber: '',
+    Remarks: '',
     TruckCapacity: '',
     TareWeight: '', // User will enter this
     GrossWeight: '', // From original outward record
@@ -206,6 +210,10 @@ export default function MaterialOutwardTareCapture() {
           GateEntryNumber: value.trim(),
           GateEntryDate: parsedDate || prev.GateEntryDate,
           TruckNumber: outwardRecord.TruckNumber || '',
+          TransporterCode: outwardRecord.TransporterCode || '',
+          LRGCNumber: outwardRecord.LRGCNumber || '',
+          PermitNumber: outwardRecord.PermitNumber || '',
+          Remarks: outwardRecord.Remarks || '',
           GateFiscalYear: outwardRecord.FiscalYear || outwardRecord.GateFiscalYear || prev.GateFiscalYear,
           FiscalYear: outwardRecord.FiscalYear || prev.FiscalYear,
 
@@ -499,11 +507,58 @@ const handleGoodsIssue = async () => {
             </div>
 
             <div className="form-group">
-              <label className="form-label">Truck Number</label>
+              <label className="form-label">Vehicle Number</label>
               <input
                 type="text"
                 name="TruckNumber"
                 value={form.TruckNumber}
+                className="form-input"
+                readOnly
+                style={{ backgroundColor: '#f0f0f0' }}
+              />
+            </div>
+
+            <div className="form-group">
+              <label className="form-label">Transporter</label>
+              <input
+                type="text"
+                name="TransporterCode"
+                value={form.TransporterCode}
+                className="form-input"
+                readOnly
+                style={{ backgroundColor: '#f0f0f0' }}
+              />
+            </div>
+
+            <div className="form-group">
+              <label className="form-label">LR/GC Number</label>
+              <input  
+                type="text"
+                name="LRGCNumber"
+                value={form.LRGCNumber}
+                className="form-input"
+                readOnly
+                style={{ backgroundColor: '#f0f0f0' }}
+              />
+            </div>
+
+            <div className="form-group">
+              <label className="form-label">Permit Number</label>
+              <input
+                type="text"
+                name="PermitNumber"
+                value={form.PermitNumber}
+                className="form-input"
+                readOnly
+                style={{ backgroundColor: '#f0f0f0' }}
+              />
+            </div>
+            <div className="form-group">
+              <label className="form-label">Remarks</label>
+              <input
+                type="text"
+                name="Remarks"
+                value={form.Remarks}
                 className="form-input"
                 readOnly
                 style={{ backgroundColor: '#f0f0f0' }}
