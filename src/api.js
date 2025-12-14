@@ -1,7 +1,7 @@
 import axios from 'axios';
-export const API_BASE = 'http://localhost:4600/api';
+//export const API_BASE = 'http://localhost:4600/api';
 //export const API_BASE = 'https://gateentry.cfapps.ap21.hana.ondemand.com/api';
-//export const API_BASE = 'https://gateentry-backend.onrender.com/api';
+export const API_BASE = 'https://gateentry-backend.onrender.com/api';
 
 const api = axios.create({
   baseURL: API_BASE,
