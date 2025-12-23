@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect, useRef } from "react";
 //import { userCrenditials } from "./api";
 import { userCrenditials } from "./api.js";
 import { BrowserRouter as Router, Routes, Route, Link, Navigate, useNavigate } from "react-router-dom";
@@ -22,6 +22,7 @@ import Loaded_TransferPosting from "./pages/TransferPosting/loadedtruckITP.jsx";
 import ITPHome from "./pages/TransferPosting/ITPHome.jsx";
 import TruckRegistration from "./pages/TransferPosting/TruckReg.jsx";
 import StoreConsubale from "./pages/Gateinmovementin/StoreConsubale.jsx";
+import LiveDashBoard from "./pages/Gateinmovementin/LiveDashBoard.jsx";
 import "./App.css";
 
 // Protected Route Component
@@ -33,7 +34,7 @@ const ProtectedRoute = ({ children, allowedRoles }) => {
   if (roleCode === "101") return children; // admin: allow all
   if (allowedRoles && !allowedRoles.includes(roleCode)) {
     return (
-      <div style={{ padding: "40px", textAlign: "center", color: "Yellow", fontWeight: "bold" }}>
+      <div style={{ padding: "40px", textAlign: "center", color: "red", fontWeight: "bold" }}>
         Your ID is not authorized for this page.
       </div>
     );
@@ -59,7 +60,7 @@ const HomePage = () => {
   <div>
     <h1 style={{ marginBottom: 20 }}>Gate Entry Screen</h1>
     <nav className="main-nav">
-      <Link to="/home" className="card-link">Dashboard</Link>
+      <Link to="/home/livedashboard" className="card-link">Dashboard</Link>
       <Link to="/home/initial_registration" className="card-link">Initial Registration</Link>
     </nav>
   </div>
@@ -183,9 +184,44 @@ const LoginPage = () => {
 };
 
 // Main App Component
+// AutoLogout component to handle inactivity logout
+function AutoLogout() {
+  const timerRef = useRef();
+  const logoutTimer = 3 * 60 * 1000; // 3 minutes
+  const navigate = useNavigate();
+
+  // Reset timer on user activity
+  const resetTimer = () => {
+    if (timerRef.current) clearTimeout(timerRef.current);
+    if (localStorage.getItem("loggedIn") === "true") {
+      timerRef.current = setTimeout(() => {
+        localStorage.removeItem("loggedIn");
+        localStorage.removeItem("roleCode");
+        localStorage.removeItem("user");
+        alert("Logged out due to inactivity.");
+        navigate("/");
+      }, logoutTimer);
+    }
+  };
+
+  useEffect(() => {
+    if (localStorage.getItem("loggedIn") === "true") {
+      const events = ["mousemove", "keydown", "mousedown", "touchstart"];
+      events.forEach((event) => window.addEventListener(event, resetTimer));
+      resetTimer();
+      return () => {
+        if (timerRef.current) clearTimeout(timerRef.current);
+        events.forEach((event) => window.removeEventListener(event, resetTimer));
+      };
+    }
+  }, [localStorage.getItem("loggedIn")]);
+  return null;
+}
+
 export default function App() {
   return (
     <Router>
+      <AutoLogout />
       <Routes>
         <Route path="/" element={<LoginPage />} />
         <Route path="/home" element={<ProtectedRoute><HomePage /></ProtectedRoute>} />
@@ -211,6 +247,7 @@ export default function App() {
         <Route path="/home/transferposting" element={<ProtectedRoute allowedRoles={["101","103"]}><ITPHome /></ProtectedRoute>} />
         <Route path="/home/truckregistration" element={<ProtectedRoute allowedRoles={["101","103"]}><TruckRegistration /></ProtectedRoute>} />
         <Route path="/home/storeconsumable" element={<ProtectedRoute allowedRoles={["101","102"]}><StoreConsubale /></ProtectedRoute>} />
+        <Route path="/home/livedashboard" element={<ProtectedRoute allowedRoles={["101","102","103"]}><LiveDashBoard /></ProtectedRoute>} />
       </Routes>
     </Router>
   );

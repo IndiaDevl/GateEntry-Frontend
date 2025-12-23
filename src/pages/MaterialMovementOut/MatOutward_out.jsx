@@ -384,7 +384,7 @@ const handleGoodsIssue = async () => {
 
     // 2) Create Goods Issue and Billing Document, and get PDF
     const response = await axios.post(
-    //  'http://localhost:4600/api/goodsissue-and-invoice',
+  //    'http://localhost:4600/api/goodsissue-and-invoice',
        'https://gateentry-backend.onrender.com/api/goodsissue-and-invoice',
       { DeliveryDocument: deliveryDoc },
       { responseType: 'arraybuffer', timeout: 60000 } // use arraybuffer for binary

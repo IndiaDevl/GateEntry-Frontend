@@ -1,9 +1,11 @@
 // Vehicle Out (Departure) screen: load by Gate Entry Number, show details, and save only OutwardTime
 import React, { useState, useEffect } from "react";
-import api, { fetchGateEntryByNumber } from "../../api";
+import api, { fetchGateEntryByNumber, checkVehicleStatus } from "../../api";
 import "./GateOutHome.css";
 
 export default function GateEntryOutwardCompletion() {
+    // Track if OutwardTime is user-set (saved) or should be live
+    const [outwardTimeLive, setOutwardTimeLive] = useState(false);
   const currentDate = new Date().toISOString().split("T")[0];
 
   // --- helpers ---
@@ -62,7 +64,8 @@ export default function GateEntryOutwardCompletion() {
     const base = {
       GateEntryNumber: r.GateEntryNumber || "",
       GateEntryDate: (r.GateEntryDate || "").slice(0, 10) || currentDate,
-      VehicleStatus: "OUT",
+      GateOutDate: currentDate,
+      VehicleStatus: r.VehicleStatus || r.status || "", // <-- use real status
       VehicleNumber: r.VehicleNumber || "",
       TransporterName: r.TransporterName || "",
       DriverName: r.DriverName || "",
@@ -113,6 +116,7 @@ export default function GateEntryOutwardCompletion() {
       GateEntryNumber: "",
       VehicleStatus: "OUT",
       GateEntryDate: currentDate,
+      GateOutDate: currentDate,
       VehicleNumber: "",
       TransporterName: "",
       DriverName: "",
@@ -183,11 +187,21 @@ export default function GateEntryOutwardCompletion() {
         return;
       }
       setLoadedGuid(guid);
-      setHeader(hydrateHeaderFromSap(rec));
-      // If no outward time yet, prefill with now for convenience
-      if (!rec.OutwardTime) {
-        setHeader((prev) => ({ ...prev, OutwardTime: hhmmssNow() }));
+      // Hydrate header and set GateOutDate and OutwardTime (if missing) to current values, but DO NOT overwrite VehicleStatus
+      const hydrated = hydrateHeaderFromSap(rec);
+      const nowDate = new Date().toISOString().split("T")[0];
+      const nowTime = hhmmssNow();
+      // If OutwardTime is missing, enable live mode
+      if (!hydrated.OutwardTime) {
+        setOutwardTimeLive(true);
+      } else {
+        setOutwardTimeLive(false);
       }
+      setHeader(prev => ({
+        ...hydrated,
+        GateOutDate: nowDate,
+        OutwardTime: hydrated.OutwardTime || nowTime
+      }));
     } catch (err) {
       setError(
         err?.response?.data?.error?.message?.value ||
@@ -201,6 +215,7 @@ export default function GateEntryOutwardCompletion() {
 
   const handleSetOutwardNow = () => {
     setHeader((prev) => ({ ...prev, OutwardTime: hhmmssNow() }));
+    setOutwardTimeLive(false);
   };
 
   const handleSaveOutward = async (e) => {
@@ -213,25 +228,30 @@ export default function GateEntryOutwardCompletion() {
       return;
     }
 
+    // Block save if already OUT
+    if (header.VehicleStatus === "OUT") {
+      setError("Vehicle is already marked as OUT. Cannot save departure again.");
+      return;
+    }
+
+    // if somehow duration is in state, convert to HH:mm:ss for consistent UX
     if (header?.OutwardTime && header?.OutwardTime.length && header?.OutwardTime.startsWith("PT")) {
-      // if somehow duration is in state, convert to HH:mm:ss for consistent UX
       setHeader((prev) => ({ ...prev, OutwardTime: sapDurationToHHMMSS(prev.OutwardTime) }));
     }
 
     setUpdating(true);
     try {
-      // ONLY send OutwardTime - do NOT send SAP_ModifiedDateTime or any other fields
       const payload = {
         OutwardTime: hhmmssToSapDuration(header.OutwardTime || hhmmssNow()),
+        VehicleStatus: "OUT",
+        GateOutDate: new Date().toISOString().split("T")[0],
       };
-      
       console.log('[DEBUG] Sending PATCH with payload:', payload);
-      
       const resp = await api.patch(`/headers/${loadedGuid}`, payload);
       if (resp.status >= 200 && resp.status < 300) {
         setResult("Outward time saved. Vehicle marked departed.");
-        // Update local state with the new outward time
-        setHeader(prev => ({ ...prev, OutwardTime: header.OutwardTime }));
+        setHeader(prev => ({ ...prev, OutwardTime: header.OutwardTime, VehicleStatus: "OUT" }));
+        setOutwardTimeLive(false);
       } else {
         setError(`Unexpected status ${resp.status}`);
       }
@@ -322,6 +342,7 @@ export default function GateEntryOutwardCompletion() {
                 name="OutwardTime"
                 value={header.OutwardTime}
                 readOnly
+                style={outwardTimeLive ? { color: '#007bff', fontWeight: 600 } : {}}
               />
               <button type="button" className="btn btn-secondary" onClick={handleSetOutwardNow}>
                 Set Now
@@ -398,7 +419,7 @@ export default function GateEntryOutwardCompletion() {
         <button
           type="button"
           onClick={handleSaveOutward}
-          disabled={updating || !loadedGuid}
+          disabled={updating}
           className={`btn btn-primary ${updating ? "disabled" : ""}`}
         >
           {updating ? "Saving..." : "Save Departure Time"}

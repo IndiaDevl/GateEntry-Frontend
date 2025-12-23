@@ -1,7 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { 
-  fetchNextWeightDocNumber,fetchGateEntryByNumber,fetchSalesOrderByNumber,updateMaterialInward,fetchSalesOrderSuggestions,updateobdMaterialOutward
-,createOBDandMaterialOutwardCreate} from '../../api';
+  fetchNextWeightDocNumber,fetchGateEntryByNumber,fetchSalesOrderByNumber,updateMaterialInward,fetchSalesOrderSuggestions,updateobdMaterialOutward,
+  fetchMaterialOutwardByGateNumber,
+  createOBDandMaterialOutwardCreate
+} from '../../api';
 import './MaterialINHome';
 
 // Helper: ISO timestamp
@@ -234,6 +236,17 @@ export default function MaterialOutward() {
       setLoading(true);
       setError(null);
       try {
+        // 1. Check for existing material outward for this gate entry
+        const outwardResp = await fetchMaterialOutwardByGateNumber(value.trim());
+        const outwardResults = outwardResp?.data?.d?.results || outwardResp?.data?.value || [];
+        if (Array.isArray(outwardResults) && outwardResults.length > 0) {
+          setError('This Gate Entry Number already has a weightbridge/material outward record.');
+          setForm(prev => ({ ...prev, GateEntryNumber: '' })); // Optionally clear the field
+          setLoading(false);
+          return;
+        }
+
+        // 2. Existing logic: fetch gate entry details
         const entry = await fetchGateEntryDetails(value.trim());
         if (!entry) return;
 

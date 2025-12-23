@@ -1,7 +1,7 @@
 import axios from 'axios';
-//export const API_BASE = 'http://localhost:4600/api';
+export const API_BASE = 'http://localhost:4600/api';
 //export const API_BASE = 'https://gateentry.cfapps.ap21.hana.ondemand.com/api';
-export const API_BASE = 'https://gateentry-backend.onrender.com/api';
+//export const API_BASE = 'https://gateentry-backend.onrender.com/api';
 
 const api = axios.create({
   baseURL: API_BASE,
@@ -70,6 +70,10 @@ export function fetchNextWeightNumber(year, code) {
 export const fetchGateEntryByNumber = (gateEntryNumber) => {
   const filter = `$filter=GateEntryNumber eq '${gateEntryNumber}'&$format=json`;
   return api.get(`/headers?${filter}`);
+};
+// Vehicle status IN means need to error
+export const checkVehicleStatus = (VehicleNumber) => {
+  return api.get(`/headers/vehiclestatus/${VehicleNumber}`);
 };
 
 export const updateHeaderByUUID = (uuid, data) =>
@@ -223,6 +227,12 @@ export function updateOutboundDelivery(deliveryDocument, itemNumber, payload) {
 export function createGoodsIssue(payload, options = {}) {
   return api.post('/goodsissue-and-invoice', payload, options);
 }
+
+// Add this to your api.js file:
+export const fetchGateEntriesByPO = (poNumber) => {
+  const filter = `$filter=substringof('${poNumber}', PurchaseOrderNumber1) or substringof('${poNumber}', PurchaseOrderNumber2) or substringof('${poNumber}', PurchaseOrderNumber3) or substringof('${poNumber}', PurchaseOrderNumber4) or substringof('${poNumber}', PurchaseOrderNumber5)&$top=100`;
+  return api.get(`/headers?${filter}`);
+};
 
 
 export default api;

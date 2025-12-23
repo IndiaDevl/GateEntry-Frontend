@@ -176,7 +176,7 @@ export default function Outward() {
       setHeader(h => ({ 
         ...h, 
         InwardTime: currentTime,
-        OutwardTime: currentTime
+        OutwardTime: ""
       }));
     }
   }, [mode]);

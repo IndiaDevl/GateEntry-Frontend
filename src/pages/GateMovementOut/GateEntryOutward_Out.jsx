@@ -117,16 +117,20 @@ export default function GateEntryOutwardSD() {
 
   // --- mapping only SD / dispatch related fields ---
   const hydrateFromSap = (r = {}) => {
+    // Always set outward time to current time when hydrating
+    const now = new Date();
+    const currentTime = `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}:${String(now.getSeconds()).padStart(2, "0")}`;
+    const currentDate = now.toISOString().split("T")[0];
     const base = {
       GateEntryNumber: r.GateEntryNumber || "",
-      VehicleStatus: "OUT",
+      VehicleStatus: r.VehicleStatus || r.status || "", // <-- Use backend value
       GateEntryDate: (r.GateEntryDate || "").slice(0, 10) || todayISO,
+      GateOutDate: currentDate,
       VehicleNumber: r.VehicleNumber || r.TruckNumber || r.LorryNumber || "",
       TransporterName: r.TransporterName || r.Transporter || r.CarrierName || "",
       DriverName: r.DriverName || r.Driver || "",
       DriverPhoneNumber: r.DriverPhoneNumber || r.DriverMobile || r.DriverPhone || "",
-      OutwardTime: sapDurationToHHMMSS(r.OutwardTime) || "",
-      // SD documents (optional) - include common variants
+      OutwardTime: currentTime,
       salesdocument:
         r.salesdocument ||
         r.saledocument ||
@@ -147,6 +151,7 @@ export default function GateEntryOutwardSD() {
     GateEntryNumber: "",
     VehicleStatus: "OUT",
     GateEntryDate: todayISO,
+    GateOutDate: todayISO,
     VehicleNumber: "",
     TransporterName: "",
     DriverName: "",
@@ -196,9 +201,12 @@ export default function GateEntryOutwardSD() {
       }
       setGuid(g);
       const hydrated = hydrateFromSap(rec);
-      // Prefill outward time if not existing
-      if (!hydrated.OutwardTime) hydrated.OutwardTime = hhmmssNow();
-      setData(hydrated);
+      // Only update GateOutDate to current, do NOT overwrite VehicleStatus
+      const currentDate = new Date().toISOString().split("T")[0];
+      setData(prev => ({
+        ...hydrated,
+        GateOutDate: currentDate
+      }));
     } catch (err) {
       setError(
         err?.response?.data?.error?.message?.value ||
@@ -221,19 +229,28 @@ export default function GateEntryOutwardSD() {
       setError("Load an entry first.");
       return;
     }
+    // Block save if already OUT
+    if (data.VehicleStatus === "OUT") {
+      setError("Vehicle is already marked as OUT. Cannot save departure again.");
+      return;
+    }
     // Normalize
     if (data.OutwardTime?.startsWith("PT")) {
       setData((prev) => ({ ...prev, OutwardTime: sapDurationToHHMMSS(prev.OutwardTime) }));
     }
 
     setSaving(true);
+    const currentDate = new Date().toISOString().split("T")[0];
     try {
       const payload = {
         OutwardTime: hhmmssToSapDuration(data.OutwardTime || hhmmssNow()),
+        VehicleStatus: "OUT",
+        GateOutDate: currentDate
       };
       const resp = await api.patch(`/headers/${guid}`, payload);
       if (resp.status >= 200 && resp.status < 300) {
         setResult("Departure time saved.");
+        setData(prev => ({ ...prev, OutwardTime: data.OutwardTime, VehicleStatus: "OUT" }));
       } else {
         setError(`Unexpected status ${resp.status}`);
       }
@@ -264,7 +281,7 @@ export default function GateEntryOutwardSD() {
               className="form-input"
               value={searchNumber}
               onChange={(e) => setSearchNumber(e.target.value)}
-              placeholder="e.g. 2520000029"
+              placeholder="Gate Outward Number Enter"
             />
           </div>
           <div className="form-group">
@@ -289,8 +306,21 @@ export default function GateEntryOutwardSD() {
             <input className="form-input" value={data.GateEntryNumber} readOnly />
           </div>
           <div className="form-group">
-            <label className="form-label">Date</label>
-            <input className="form-input" type="date" value={data.GateEntryDate} readOnly />
+            <label className="form-label">Vehicle Status</label>
+            <input className="form-input" value={data.VehicleStatus} readOnly />
+          </div>
+          <div className="form-group">
+            <label className="form-label">Outward Date</label>
+            <input className="form-input" type="date" value={data.GateOutDate} readOnly />
+          </div>
+          <div className="form-group">
+            <label className="form-label">Outward Time</label>
+            <div style={{ display: "flex", gap: 8 }}>
+              <input className="form-input" value={data.OutwardTime} readOnly />
+              <button type="button" className="btn btn-secondary" onClick={handleSetOutwardNow}>
+                Set Now
+              </button>
+            </div>
           </div>
           <div className="form-group">
             <label className="form-label">Vehicle</label>
@@ -307,15 +337,6 @@ export default function GateEntryOutwardSD() {
           <div className="form-group">
             <label className="form-label">Driver Phone</label>
             <input className="form-input" value={data.DriverPhoneNumber} readOnly />
-          </div>
-          <div className="form-group">
-            <label className="form-label">Outward Time</label>
-            <div style={{ display: "flex", gap: 8 }}>
-              <input className="form-input" value={data.OutwardTime} readOnly />
-              <button type="button" className="btn btn-secondary" onClick={handleSetOutwardNow}>
-                Set Now
-              </button>
-            </div>
           </div>
         </div>
       </section>
@@ -392,15 +413,15 @@ export default function GateEntryOutwardSD() {
 
       {/* Action */}
       <div className="form-actions">
-        <button
-          type="button"
-          onClick={handleSaveOutward}
-          disabled={saving || !guid}
-          className={`btn btn-primary ${saving ? "disabled" : ""}`}
-        >
-          {saving ? "Saving..." : "Save Departure"}
-        </button>
-      </div>
+<button
+  type="button"
+  onClick={handleSaveOutward}
+  disabled={saving}
+  className={`btn btn-primary ${saving ? "disabled" : ""}`}
+>
+  {saving ? "Saving..." : "Save Departure"}
+</button>
+</div>
 
       {error && (
         <div className="error-message">

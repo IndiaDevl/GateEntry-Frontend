@@ -3,7 +3,8 @@ import React, { useState, useEffect } from 'react';
 import { 
   createMaterialInward, 
   fetchNextWeightDocNumber,
-  fetchGateEntryByNumber  
+  fetchGateEntryByNumber,
+  fetchMaterialInwardByGateNumber
 } from '../../api';
 import './MaterialINHome.css';
 
@@ -306,6 +307,16 @@ export default function MaterialInward() {
       setLoading(true);
       setError(null);
       try {
+        // 1. Check for existing material inward for this gate entry
+        const inwardResp = await fetchMaterialInwardByGateNumber(value);
+        const inwardResults = inwardResp?.data?.d?.results || inwardResp?.data?.value || [];
+        if (Array.isArray(inwardResults) && inwardResults.length > 0) {
+          setError('This Gate Entry Number already has a weightbridge/material inward record.');
+          setForm(prev => ({ ...prev, GateEntryNumber: '' })); // Optionally clear the field
+          setLoading(false);
+          return;
+        }
+
         const gateEntry = await fetchGateEntryDetails(value);
         if (!gateEntry) {
           console.log('No gate entry found for:', value);
