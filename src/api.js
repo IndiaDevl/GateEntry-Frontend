@@ -230,7 +230,8 @@ export function createGoodsIssue(payload, options = {}) {
 
 // Add this to your api.js file:
 export const fetchGateEntriesByPO = (poNumber) => {
-  const filter = `$filter=substringof('${poNumber}', PurchaseOrderNumber1) or substringof('${poNumber}', PurchaseOrderNumber2) or substringof('${poNumber}', PurchaseOrderNumber3) or substringof('${poNumber}', PurchaseOrderNumber4) or substringof('${poNumber}', PurchaseOrderNumber5)&$top=100`;
+  // Only filter on PurchaseOrderNumber (no suffixes)
+  const filter = `$filter=PurchaseOrderNumber eq '${poNumber}'&$top=100`;
   return api.get(`/headers?${filter}`);
 };
 

@@ -11,8 +11,8 @@ export default function LiveDashBoard() {
   const fetchData = async () => {
     try {
       const res = await axios.get(
-    //    "http://localhost:4600/api/material-trucks",
-        "https://gateentry-backend.onrender.com/api/material-trucks",
+        "http://localhost:4600/api/material-trucks",
+    //    "https://gateentry-backend.onrender.com/api/material-trucks",
         { params: { fromDate, toDate } }
       );
       setSales(res.data.sales);
